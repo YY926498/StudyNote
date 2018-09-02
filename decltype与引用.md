@@ -15,12 +15,12 @@
   	int i = 0;
   	int *p = &i;
   	int &r = i;
-  	decltype( i )i1;		      //i1为 int
-  	decltype( ( i ) )i2=i;	  //i2为 int &
-  	decltype( r )i3=i2;		    //i3为 int &
-  	decltype( r + 1 )i4;	    //i4为 int
-  	decltype( p )i5;		      //i5为 int *
-  	decltype( *p )i6=i;		    //i6为 int &
+  	decltype( i )i1;		//i1为 int
+  	decltype( ( i ) )i2=i;	//i2为 int &
+  	decltype( r )i3=i2;		//i3为 int &
+  	decltype( r + 1 )i4;	//i4为 int
+  	decltype( p )i5;		//i5为 int *
+  	decltype( *p )i6=i;		//i6为 int &
   	system("pause");
   	return 0;
   }
