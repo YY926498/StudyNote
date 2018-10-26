@@ -1,6 +1,6 @@
 # const 和non-const成员函数避免重复
 
-如果成员函数有个const区别，代表成员函数被重载。
+如果成员函数有个`const`区别，代表成员函数被重载。
 
 由于两类函数有部分功能重复，因此可以定义一个功能，另外一个函数调用另一个重载的成员函数。
 
@@ -27,8 +27,8 @@ private:
 }
 ~~~
 
-再`char & operator[](size_t pos)`中，使用`static_cast`先将对象转成const类型，避免无穷递归。转成const类型后，调用`const char& operator[](size_t pos) const`函数，然后将返回的const类型通过`const_cast`转换符，删去const属性。
+在`char & operator[](size_t pos)`中，使用`static_cast`先将对象转成`const`类型，避免无穷递归。转成`const`类型后，调用`const char& operator[](size_t pos) const`函数，然后将返回的`const`类型通过`const_cast`转换符，删去`const`属性。
 
-为什么不先定义non-const函数，再用const函数调用non-const函数？
+为什么不先定义`non-const`函数，再用`const`函数调用`non-const`函数?
 
-**这是因为const成员函数承诺绝不改变其对象的逻辑状态，如果在const成员函数内调用non-const成员函数，就会冒这种风险。**
+**这是因为`const`成员函数承诺绝不改变其对象的逻辑状态，如果在`const`成员函数内调用`non-const`成员函数，就会冒这种风险。**
