@@ -1,6 +1,6 @@
 # class的default constructor
 
-有4种情况，会造成“编译器必须为未声明constructor的classes合成一个default constructor“。这种默认构造函数被称为隐式有用的==默认构造函数==。这种默认构造函数是只服务与编译器，而不是程序的需要。
+有4种情况，会造成“编译器必须为未声明constructor的classes合成一个default constructor“。这种默认构造函数被称为隐式有用的==默认构造函数==。这种默认构造函数是只服务于编译器，而不是程序的需要。
 
 - 成员对象含有默认构造函数
 - 基类含有默认构造函数
