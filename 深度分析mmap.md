@@ -22,6 +22,8 @@
 
 `mmap`是一种内存映射文件的方法，即将一个文件或者其它对象映射到进程的地址空间，实现文件磁盘地址和进程虚拟地址空间中一段虚拟地址的一一对映关系。实现这样的映射关系后，进程就可以采用指针的方式读写操作这一段内存，而系统会自动回写脏页面到对应的文件磁盘上，即完成了对文件的操作而不必再调用read,write等系统调用函数。相反，内核空间对这段区域的修改也直接反映用户空间，从而可以实现不同进程间的文件共享。如下图所示：
 
+https://www.google.com.hk/url?sa=i&source=images&cd=&ved=2ahUKEwiK3q6mpqrjAhUQL3wKHb87ChAQjRx6BAgBEAU&url=https%3A%2F%2Fblog.csdn.net%2Fqq_17612199%2Farticle%2Fdetails%2F51766293&psig=AOvVaw2V27kGYktNTC0Yjz1G-OZ-&ust=1562846296748863
+
 ​          ![img](https://images0.cnblogs.com/blog2015/571793/201507/200501092691998.png)
 
 由上图可以看出，进程的虚拟地址空间，由多个虚拟内存区域构成。虚拟内存区域是进程的虚拟地址空间中的一个同质区间，即具有同样特性的连续地址范围。上图中所示的text数据段（代码段）、初始数据段、BSS数据段、堆、栈和内存映射，都是一个独立的虚拟内存区域。而为内存映射服务的地址空间处在堆栈之间的空余部分。
@@ -90,7 +92,7 @@ int mmap(struct file *filp, struct vm_area_struct *vma)
 
 # mmap和常规文件操作的区别
 
-对linux文件系统不了解的朋友，请参阅我之前写的博文《[从内核文件系统看文件读写过程](http://www.cnblogs.com/huxiao-tee/p/4657851.html)》，我们首先简单的回顾一下常规文件系统操作（调用read/fread等类函数）中，函数的调用过程：
+简单的回顾一下常规文件系统操作（调用read/fread等类函数）中，函数的调用过程：
 
 1、进程发起读文件请求。
 
