@@ -1,4 +1,4 @@
-# 深度分析mmap：性能总结
+# 深度分析mmap：性能总结（来源CSDN）
 
 **目录**
 
@@ -90,7 +90,7 @@ int mmap(struct file *filp, struct vm_area_struct *vma)
 
 # mmap和常规文件操作的区别
 
-对linux文件系统不了解的朋友，请参阅我之前写的博文《[从内核文件系统看文件读写过程](http://www.cnblogs.com/huxiao-tee/p/4657851.html)》，我们首先简单的回顾一下常规文件系统操作（调用read/fread等类函数）中，函数的调用过程：
+简单的回顾一下常规文件系统操作（调用read/fread等类函数）中，函数的调用过程：
 
 1、进程发起读文件请求。
 
