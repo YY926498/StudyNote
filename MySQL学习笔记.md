@@ -187,13 +187,136 @@ DESC关键字只应用到直接位于其前面的列名。如果想对多个列�
 
 ### 使用WHERE子句
 
+检索数据时，通常只会根据特定操作或报告的需要提取表数据的子集。只检索所需数据需要指定搜索条件，搜索条件也被称为过滤条件。
 
+在SELECT语句中，数据根据WHERE子句中指定的搜索条件进行过滤。WHERE子句在表名（FROM子句）之后给出，如下所示：
 
+~~~mysql
+SELECT prod_name,prod_price
+FROM products
+WHERE prod_price = 2.50;
+~~~
 
+这条语句从products表中检索出两个列，但不返回所有行，只返回prod_price=2.50的行。
 
+WHERE子句的位置：在同时使用ORDER BY和WHERE子句时，应该让ORDER BY位于WHERE之后，否则将会发生错误。
 
+### WHERE子句操作符
 
+~~~mysql
+=	等于
+<>	不等于
+!=	不等于
+<	小于
+<=	小于等于
+>	大于
+>=	大于等于
+BETWEEN	在指定的两个值之间
+~~~
 
+#### 检查单个值
+
+~~~mysql
+SELECT prod_anme,prod_price
+FROM products
+WHERE prod_price <= 10;
+~~~
+
+检索价格小于等于10的所有产品
+
+#### 不匹配检查
+
+~~~mysql
+SELECT vend_id,prod_name
+FROM products
+WHERE vend_id <> 1000 
+ORDER BY vend_id 
+LIMIT 1 OFFSET 0;
+~~~
+
+查找vend_id不等于1000的按照vend_id递增排序的第一行。
+
+使用引号：在WHERE子句中可能使用引号，单引号用来限定字符串。如果将值与串类型的列进行比较，则需要限定引号。用来与数值列进行比较的值不用引号。
+
+#### 范围值检查
+
+使用BETWEEN操作符。
+
+~~~mysql
+SELECT prod_name,prod_price
+FROM products
+WHERE prod_price BETWEEN 5 AND 10;
+~~~
+
+检索价格在5到10之间。BETWEEN匹配范围中的所有制，包括指定的开始值和结束值。
+
+#### 空值检查
+
+在创建表时，可以指定其中的列是否可以不包含值。在一个列不包含值时，称其为包含空值NULL。
+
+NULL 无值，与字段包含0、空字符串或仅仅包含空格不同。
+
+特殊的WHERE子句，用来检查具有NULL的列。
+
+~~~mysql
+SELECT prod_name,prod_price
+FROM products
+WHERE prod_price IS NULL;
+~~~
+
+返回没有价格的所有产品。
+
+​	NULL与不匹配：在通过过滤选择出不具有特定值的行时，可能希望返回具有NULL值得行。但是，不行。因为未知具有特殊的含义，数据库不知道他们是否匹配，所以在匹配过滤或不匹配过滤时不返回它们。
+
+因此，在过滤数据时，一定要验证返回数据中确实给出了被过滤列具有NULL的行。
+
+---
+
+## 数据过滤
+
+组合WHERE子句建立功能更强的更高级的搜索条件。MySQL允许给出多个WHERE子句，这些子句可以以两种方式使用：以AND子句的方式或OR子句的方式使用。
+
+### AND子句：
+
+~~~mysql
+SELECT prod_id,prod_price,prod_name
+FROM products
+WHERE vend_id = 1003 AND prod_price <= 1000;
+~~~
+
+返回vend_id=1003且价格小于等于1000的所有产品的id、价格和名称。
+
+### OR子句：
+
+~~~mysql
+SELECT prod_name,prod_id
+FROM products
+WHERE vend_id = 1002 OR vend_id = 1003;
+~~~
+
+返回vend_id=1002或者vend_id=1003的商品名称和id。
+
+### 计算次序
+
+~~~mysql
+SELECT prod_name,prod_price
+FROM products
+WHERE vend_id = 1002 OR vend_id = 1003 AND prod_price >=10;
+~~~
+
+SQL在处理OR操作符前，优先处理AND操作符。当SQL看到上述WHERE子句时，理解为由vend_id=1003制造的任何价格在10（含）以上的产品，或者由vend_id=1002制造的任何产品，而不管其价格如何。
+
+解决方法是使用圆括号明确地分组相应的操作符。如下：
+
+~~~mysql
+SELECT prod_name,prod_price
+FROM products
+WHERE (vend_id = 1002 OR vend_id = 1003) AND prod_price >= 10;
+~~~
+
+圆括号具有较AND和OR操作符高的计算次序。
+
+**在WHERE子句中使用圆括号**：任何时候使用具有AND和OR操作符的WHERE子句，都应该使用圆括号明确地分组操作符。不要过分依赖默认计算次序，即使它确实是你想要的东西也是如此
 
 
 
