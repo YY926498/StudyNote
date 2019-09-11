@@ -316,9 +316,102 @@ WHERE (vend_id = 1002 OR vend_id = 1003) AND prod_price >= 10;
 
 圆括号具有较AND和OR操作符高的计算次序。
 
-**在WHERE子句中使用圆括号**：任何时候使用具有AND和OR操作符的WHERE子句，都应该使用圆括号明确地分组操作符。不要过分依赖默认计算次序，即使它确实是你想要的东西也是如此
+**在WHERE子句中使用圆括号**：任何时候使用具有AND和OR操作符的WHERE子句，都应该使用圆括号明确地分组操作符。不要过分依赖默认计算次序，即使它确实是你想要的东西也是如此。
 
+### IN操作符
 
+IN操作符用来指定条件范围，范围中的每个条件都可以进行匹配。IN取合法值的由逗号分隔的清单，全都在圆括号中。
+
+~~~mysql
+SELECT prod_name, prod_price
+FROM products
+WHERE vend_id IN (1002,1003)
+ORDER BY prod_name;
+~~~
+
+此SELECT语句检索vend_id为1002和1003的所有数据。IN操作符后的合法值清单，必须在圆括号中。与OR等价。
+
+IN操作符的优点：
+
+- 在使用长的合法选项清单时，IN操作符的语法更清楚且更直观
+- 在使用IN时，计算的次序更容易管理（因为使用的操作符更少）
+- IN操作符一般比OR操作符清单执行更快
+- IN的最大优点是可以包含其他SELECT语句，使得能够更动态的建立WHERE子句。
+
+### NOT操作符
+
+WHERE子句中的NOT操作符有且只有一个功能，那就是否定它之后所跟的任何条件。
+
+~~~mysql
+SELECT prod_name, prod_price
+FROM products
+WHERE vend_id NOT IN (1002,1003)
+ORDER BY prod_name;
+~~~
+
+这里的NOT否定跟在它之后的条件，因此，现在匹配vend_id不是1002和1003的所有其他数据。
+
+MySQL中的NOT 支持使用NOT对IN、BETWEEN和EXISTS子句取反。
+
+NOT仅对其后的一个条件有影响，再之后的条件无影响
+
+~~~mysql
+SELECT DISTINCT prod_name, prod_price
+FROM products
+WHERE prod_price NOT IN(5,10) AND prod_price = 9;
+~~~
+
+上面的语句是找出价格不等于5和10并且价格等于9的所有数据。
+
+## 用通配符进行过滤
+
+### LIKE操作符
+
+**通配符**：用来匹配值得一部分的特殊字符
+
+**搜索模式**：由字面值、通配符或两者组合构成的搜索条件。
+
+为在搜索子句中使用通配符，必须使用LIKE操作符。LIKE指示MySQL后跟的搜索模式利用通配符匹配而不是直接相等匹配进行比较。
+
+**谓词**：操作符何时不是操作符？答案是它作为谓词时。从技术上说，LIKE是谓词而不是操作符。虽然最终的结果是相同的，但应该对此术语有所了解。
+
+#### 百分号(%)通配符
+
+%表示任何字符出现任意次数。
+
+~~~mysql
+SELECT prod_id, prod_name
+FROM products
+WHERE prod_name LIKE 'jet%';
+~~~
+
+使用搜素模式‘jet%’。在执行这条子句时，将检索任何以‘jet’起头的词。‘%’告诉MySQL接受jet之后的任意字符，不管有多少字符。
+
+如果需要区分大小写，需要在MySQL中进行配置，因此搜索可以是区分大小写的。
+
+通配符可以在搜索模式中任意位置使用，并且可以使用多个通配符。
+
+~~~mysql
+SELECT prod_id, prod_name
+FROM products
+WHERE prod_name LIKE '%anvil%';
+~~~
+
+搜索模式‘%anvil%’表示匹配任何位置包含文本anvil的值，而不论它之前或之后出现什么字符。
+
+通配符也可以出现在搜索模式的中间，但不太有用。
+
+~~~mysql
+SELECT prod_name, prod_price
+FROM products
+WHERE prod_name LIKE 's%e';
+~~~
+
+%可以匹配0个字符、1个字符或多个。
+
+**注意尾空格**：尾空格可能会干扰通配符匹配。一个简单的办法是在搜索模式最后附加一个%，一个更好的办法是使用函数去掉首尾空格。
+
+**注意NULL**：虽然似乎%通配符可以匹配任何东西，但有一个例外，即NULL。即使是WHERE prod_name LIKE '%`也不能匹配用值NULL作为产品名的行。
 
 
 
