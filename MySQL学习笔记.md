@@ -413,7 +413,107 @@ WHERE prod_name LIKE 's%e';
 
 **注意NULL**：虽然似乎%通配符可以匹配任何东西，但有一个例外，即NULL。即使是WHERE prod_name LIKE '%`也不能匹配用值NULL作为产品名的行。
 
+#### 下划线(_)通配符
 
+下划线的用途与%一样，但下划线只匹配单个字符而不是多个字符。
 
+~~~mysql
+SELECT prod_id,prod_name
+FROM products
+WHERE prod_name LIKE '_ ton anvil'
+~~~
 
+此WHERE子句中的搜索模式给出了后面跟有文本的两个通配符。结果只显示匹配搜索模式的行。即必须是如`1 ton anvil`，但是`34 ton anvil`无法匹配到
 
+与%能匹配0个字符不一样，_总是匹配一个字符，不能多也不能少。
+
+### 使用通配符的技巧
+
+- 不要过度使用通配符。如果其他操作符能达到相同的目的，应该使用其他操作符。
+- 在确实需要使用通配符时，除非绝对有必要，否则不要把他们用在搜索模式的开始处。把通配符置于搜索模式的开始处，搜索起来是最慢的。
+- 仔细注意通配符的位置。如果放错地方，可能不会返回想要的数据。
+
+---
+
+## 用正则表达式进行搜索
+
+正则表达式的作用是匹配文本，将一个模式（正则表达式）与一个文本串进行比较。MySQL用WHERE子句对正则表达式提供了初步的支持，允许指定正则表达式，过滤SELECT检索出的数据。
+
+### 基本字符匹配
+
+~~~mysql
+SELECT prod_name, prod_price
+FROM products
+WHERE prod_name REGEXP '1000'
+ORDER BY prod_name;
+~~~
+
+除关键字`LIKE`被`REGEXP`替代外，这条语句非常像使用`LIKE`的语句。它告诉`MySQL：REGEXP`后所跟的东西作为正则表达式处理。
+
+~~~mysql
+SELECT DISTINCT prod_name,prod_price
+FROM products
+WHERE prod_name REGEXP '.000'
+ORDER BY prod_name;
+~~~
+
+这里使用正则表达式`.000`。其中`.`是正则表达式语言中一个特殊的字符。它表示匹配任意一个字符，因此，1000和2000都匹配且返回。
+
+LIKE和REGEXP：在LIKE和REGEXP之间有一个重要的差别。如下：
+
+~~~mysql
+SELECT prod_name, prod_price
+FROM products
+WHERE prod_name LIKE '1000'
+ORDER BY prod_name;
+~~~
+
+~~~mysql
+SELECT prod_name, prod_price
+FROM products
+WHERE prod_name REGEXP '1000'
+ORDER BY prod_name;
+~~~
+
+LIKE匹配整个列。如果被匹配的文本在列值中出现，LIKE将不会找到它，相应的行也不会被返回（除非使用通配符）。而REGEXP在列值内进行匹配，如果被匹配的文本在列值中出现，REGEXP将会找到它，相应的行将被返回。这是一个重要的差别。
+
+匹配不区分大小写：正则表达式匹配，如果要区分大小写，使用BINARY关键字，如`WHERE prod_name REGEXP BINARY ‘JetPack .000’`。
+
+### 进行OR匹配
+
+为搜索两个串之一（或者为这个串，或者为另一个串），使用`|`，如下所示：
+
+~~~mysql
+SELECT prod_name
+FROM products
+WHERE prod_name REGEXP '1000|2000'
+ORDER BY prod
+~~~
+
+语句中使用了正则表达式`1000|2000`。`|`为正则表达式的OR操作符。它表示匹配其中之一，因此1000和2000都匹配并返回。
+
+### 匹配几个字符之一
+
+匹配特定的字符，可以通过指定一组用`[]`括起来的字符来完成。如下：
+
+~~~mysql
+SELECT prod_name
+FROM products
+WHERE prod_name REGEXP '[123] Ton'
+ORDER BY prod_name;
+~~~
+
+这里，使用了正则表达式`[123] Ton`。`[123]`定义了一组字符，它的意思是匹配1或2或3，因此1 ton 和2 ton和3 ton都匹配且返回。
+
+`[]`是另一种形式的OR语句。事实上，正则表达式`[123]Ton`为`[1|2|3]ton`的缩写。但是如下写法存在一定问题：
+
+~~~mysql
+SELECT prod_name
+FROM products
+WHERE prod_name REGEXP '1|2|3 Ton'
+ORDER BY prod_name;
+~~~
+
+这时的意思是‘1’或‘2’或‘3 ton’。除非把字符`|`括在一个集合中，否则将应用于整个串。
+
+字符集合也可以被否定，即，它们将匹配除指定字符外的任何东西。为否定一个字符集，在集合开始处放置一个`^`即可。因此，尽管`[123]`匹配字符`1`、`2`或`3`，但`[^123]`却匹配除这些字符外的任何东西。
