@@ -1011,4 +1011,27 @@ GROUP BY vend_id;
 - GROUP BY子句中列出的每个列都必须是检索列或有效的表达式（但不能是聚集函数）。如果在SELECT中使用了表达式，则必须在GROUP BY子句中指定相同的表达式。不能使用别名。
 - 除聚集计算语句外，SELECT语句中的每个列都必须在GROUP BY子句中给出。
 - 如果分组列中具有NULL值，则NULL将作为一个分组返回。如果列中有多行的NULL值，他们将分为一组。
-- GROUP BY 子句必须出现在WHERE子句之后，ORDER BY子句之前。
+- <u>GROUP BY 子句必须出现在WHERE子句之后，ORDER BY子句之前</u>。
+
+**使用ROLLUP**：使用WITH ROLLUP关键字，可以得到每个分组以及每个分组汇总级别（针对每个分组）的值，如下所示：
+
+~~~mysql
+SELECT vend_id, COUNT(*) AS num_prods
+FROM products
+GROUP BY vend_id WITH ROLLUP;
+~~~
+
+### 过滤分组
+
+除了使用GROUP BY分组数据外，MySQL还允许过滤分组，规定包括哪些分组，排除哪些分组。WHERE过滤指定的是行而不是分组。达成这个目标可以采用HAVING子句。与WHERE子句类似。唯一的差别是WHERE子句过滤行，HAVING子句过滤分组。
+
+**HAVING支持所有WHERE操作符**：所有的WHERE子句的条件（包括通配符条件和带多个操作符的子句）。君可用于HAVING子句。
+
+~~~mysql
+SELECT cust_id, COUNT(*) AS orders
+FROM orders
+GROUP BY cust_id
+HAVING COUNT(*) >= 2;
+~~~
+
+这条SELECT语句的前3行类似于上面的语句。最后一行增加了HAVING子句，它过滤COUNT(*)>=2的那些分组。
