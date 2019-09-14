@@ -846,3 +846,169 @@ Year()是一个从日期（或日期时间）中返回年份的函数。类似�
 
 ### 聚集数据
 
+**聚集函数**：运行在行组上，计算和返回单个值得函数。
+
+|  函数   |       说明       |
+| :-----: | :--------------: |
+|  AVG()  | 返回某列的平均值 |
+| COUNT() |  返回某列的行数  |
+|  MAX()  | 返回某列的最大值 |
+|  MIN()  | 返回某列的最小值 |
+|  SUM()  |  返回某列值之和  |
+
+#### AVG()函数
+
+通过对表中行数计数并计算特定列值之和，求得该列的平均值。AVG()可用来返回所有列的平均值，也可用来返回特定列或行的平均值。
+
+~~~mysql
+SELECT AVG(prod_price) AS avg_price
+FROM products;
+~~~
+
+此SELECT语句返回值avg_price，它包含products表中所有产品的平均价格。
+
+AVG()也可以用来确定特定列或行的平均值。如下：
+
+~~~mysql
+SELECT AVG(prod_price) AS avg_price
+FROM products
+WHERE vend_id = 1003;
+~~~
+
+这条SELECT语句与之前一条的不同之处在于它包含了WHERE子句。此WHERE子句仅过滤出vend_id为1003的产品，因此avg_price返回的值只是该供应商的产品的平均值。
+
+**只用于单个列**：AVG()函数只能用来确定特定数值列的平均值，而且列名必须作为函数参数给出。为了获得多个列的平均值，必须使用多个AVG()函数。
+
+**NULL值**：AVG()函数忽略列值为NULL的行。
+
+#### COUNT()函数
+
+两种使用方式：
+
+- 使用COUNT(*)对表中行的数目进行计数，不管表列中包含的是空值（null）还是非空值
+- 使用COUNT(column)对特定列中具有值得行进行计数，忽略NULL值
+
+~~~mysql
+SELECT COUNT(*) AS num_cust
+FROM customers;
+~~~
+
+在此例中，利用COUNT(*)对所有行进行计数，不管行中各列有什么值。计数值在num_cust中返回。
+
+~~~mysql
+SELECT COUNT(cust_email) AS num_cust
+FROM customers;
+~~~
+
+这条SELECT语句使用COUNT(cust_email)对cust_email列中有值得行进行计数。
+
+**NULL值**：如果指定列名，则指定列的值为空的行被COUNT()函数忽略，但如果COUNT()函数中用的是星号（*），则不忽略。
+
+#### MAX()函数
+
+MAX()函数返回的是指定列中的最大值。MAX()要求指定列名。
+
+~~~mysql
+SELECT MAX(prod_price) AS max_price
+FROM products;
+~~~
+
+这里，MAX()返回的是products表中最贵的物品的价格。
+
+**对非值数据使用MAX()**：虽然MAX()一般用来找出最大数值或日期值，但MySQL允许将它用来返回任意列中的最大值，包括返回文本列中的最大值。在用于文本数据时，如果数据按相应的列排序，则MAX()返回最后一行。
+
+**NULL值**：MAX函数忽略列值为NULL的行。
+
+#### MIN()函数
+
+与MAX()函数相似。
+
+#### SUM函数
+
+用来返回指定列值得和。
+
+~~~mysql
+SELECT SUM(quantity) AS items_ordered
+FROM orderitems
+WHERE order_num = 20005;
+~~~
+
+函数SUM(quantity)返回订单中所有物品数量之和，WHERE子句保证只统计某个物品订单中的物品。
+
+SUM()也可以用来合计计算值。
+
+~~~mysql
+SELECT SUM(item_price*quantity) AS total_price
+FROM orderitems
+WHERE order_num = 20005;
+~~~
+
+函数SUM(item_price*quantity)返回订单中所有物品价钱之和，WHERE子句同样保证只统计某个物品订单中的物品。
+
+**在多个列上进行计算**：利用标准的算术操作符，所有聚集函数都可用来执行多个列上的计算。
+
+#### 聚集不同值
+
+以上5个聚集函数都可以如下使用：
+
+- 对所有的列执行计算，指定ALL参数或不给参数（ALL默认）
+- 只包含不同的值，指定DISTINCT参数。
+
+~~~mysql
+SELECT AVG(DISTINCT prod_price) AS avg_price
+FROM products
+WHERE vend_id = 1003;
+~~~
+
+注：对于COUNT()函数，DISTINCT不能用于COUNT(*)，即COUNT(DISTINCT)，这样会产生错误。类似地，DISTINCT必须使用列名吗，不能用于计算或表达式。
+
+DISTINCT用于MIN或MAX无意义。
+
+#### 组合聚集函数
+
+~~~MYSQL
+SELECT COUNT(*) AS num_items,
+	   MIN(prod_price) AS price_min,
+	   MAX(prod_price) AS price_max,
+	   AVG(prod_price) AS price_avg
+FROM products;
+~~~
+
+这里用单挑SELECT语句执行了4个聚集计算，返回4个值。
+
+---
+
+## 分组数据
+
+### 数据分组
+
+~~~mysql
+SELECT COUNT(*) AS num_prods
+FROM products
+WHERE vend_id = 1003;
+~~~
+
+上面是返回每供应商1003提供的产品数量。
+
+### 创建分组
+
+分组是在SELECT语句的GROUP BY子句中建立的。如下：
+
+~~~mysql
+SELECT vend_id, COUNT(*) AS num_prods
+FROM products
+GROUP BY vend_id;
+~~~
+
+上面的SELECT语句指定了两个列，vend_id包含产品供应商的ID，num_prods为计算字段（用COUNT(*)函数建立）。GROUP BY子句指示MySQL按vend_id排序并分组数据。这导致对每个vend_id而不是整个表计算num_prods一次。
+
+因为使用了GROUP BY，就不必指定要计算和估值的每个组。系统会自动完成。GROUP BY 子句指示MySQL分组数据，然后对每个组而不是整个结果进行聚集。
+
+使用GROUP BY子句前，需要知道如下重要的规定：
+
+- GROUP BY 子句可以包含任意数目的列。这使得能对分组进行嵌套，为数据分组提供更细致的控制。
+- 如果在GROUP BY子句中嵌套了分组，数据将在最后规定的分组上进行汇总。换句话说，在建立分组时，指定的所有列都一起计算（所以不能从个别列取回数据）。
+- GROUP BY子句中列出的每个列都必须是检索列或有效的表达式（但不能是聚集函数）。如果在SELECT中使用了表达式，则必须在GROUP BY子句中指定相同的表达式。不能使用别名。
+- 除聚集计算语句外，SELECT语句中的每个列都必须在GROUP BY子句中给出。
+- 如果分组列中具有NULL值，则NULL将作为一个分组返回。如果列中有多行的NULL值，他们将分为一组。
+- GROUP BY 子句必须出现在WHERE子句之后，ORDER BY子句之前。
