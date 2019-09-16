@@ -1035,3 +1035,136 @@ HAVING COUNT(*) >= 2;
 ~~~
 
 这条SELECT语句的前3行类似于上面的语句。最后一行增加了HAVING子句，它过滤COUNT(*)>=2的那些分组。
+
+这里WHERE子句不起作用，因为过滤是基于分组聚集值而不是特定行值。
+
+**HAVING和WHERE的差别**：WHERE在数据分组前进行过滤，HAVING在数据分组后进行过滤。这是一个重要的区别，WHERE排除的行不包括在分组中。这可能会改变计算值，从而影响HAVING子句中基于这些值过滤掉的分组。
+
+~~~mysql
+SELECT vend_id,COUNT(*) AS num_prods
+FROM products
+WHERE prod_price >= 10
+GROUP BY vend_id
+HAVING COUNT(*) >= 2;
+~~~
+
+第一行是使用了聚集函数的基本SELECT，它与前面的例子很相像。WHERE子句过滤所有prod_price至少为10的行。然后按vend_id分组数据。HAVING子句过滤计数为2或2以上的分组。
+
+### 分组和排序
+
+虽然GROUP BY和ORDER BY经常完成相同的工作，但他们是非常不同的。如下表所示：
+
+|                   ORDER BY                   |                         GROUP BY                         |
+| :------------------------------------------: | :------------------------------------------------------: |
+|                排序产生的输出                |             分组行。但输出可能不是分组的顺序             |
+| 任意列都可以使用（甚至非选择的列也可以使用） | 只可能使用选择列或表达式列，而且必须使用每个选择列表达式 |
+|                  不一定需要                  |     如果与聚集函数一起使用列（或表达式），则必须使用     |
+
+第一项差别极为重要。
+
+**不要忘记ORDER BY**：一般在使用GROUP BY 子句时，应该也给出ORDER BY子句。这是保证数据正确排序的唯一方法。千万不要仅依赖GROUP BY排序数据。
+
+~~~mysql
+SELECT order_num, SUM(quantity*item_price) AS ordertotal
+FROM orderitems
+GROUP BY order_num
+HAVING SUM(quantity*item_price) >=50;
+~~~
+
+上面的输出可能是乱序的，如果要排序输出，应该如下：
+
+~~~mysql
+SELECT order_num, SUM(quantity*item_price) AS ordertotal
+FROM orderitems
+GROUP BY order_num
+HAVING SUM(quantity*item_price) >= 50
+ORDER BY ordertotal;
+~~~
+
+这个例子，GROUP BY子句用来返回订单号(order_num列)分组数据，以便SUM(*)函数能够返回总计订单价格。HAVING子句过滤数据，使得只返回总计订单价格大于等于50的订单。最后，ORDER BY子句排序输出。
+
+### SELECT子句顺序
+
+具体的子句有：
+
+|   子句   |        说明        |      是否必须使用      |
+| :------: | :----------------: | :--------------------: |
+|  SELECT  | 要返回的列或表达式 |           是           |
+|   FROM   |  从中检索数据的表  | 仅在从表选择数据时使用 |
+|  WHERE   |      行级过滤      |           否           |
+| GROUP BY |      分组说明      | 仅在按组计算聚集时使用 |
+|  HAVING  |      组级过滤      |           否           |
+| ORDER BY |    输出排序顺序    |           否           |
+|  LIMIT   |    要检索的行数    |           否           |
+
+---
+
+## 使用子查询
+
+**查询**：任何SQL语句都是查询。但此术语一般指SELECT语句。
+
+**子查询**：嵌套在其他查询中的查询。
+
+### 利用子查询进行过滤
+
+例子：现在需要列出订购物品TNT2的所有客户，步骤如下：
+
+- 检索所有包含物品TNT2的所有订单的编号
+- 检索具有前一步骤列出的订单编号的所有客户的ID
+- 检索前一步骤返回的所有客户ID的客户信息
+
+第一条SELECT语句查找prod_id为TNT2的所有订单物品
+
+~~~mysql
+SELECT order_num
+FROM orderitems
+WHERE prod_id = 'TNT2';
+~~~
+
+下一步，查询上条语句返回的订单号，假如orde_num为20005和20007。
+
+~~~mysql
+SELECT cust_id
+FROM orders
+WHERE order_num IN (20005,20007);
+~~~
+
+得到对应的客户ID。
+
+现在使用子查询，如下：
+
+~~~mysql
+SELECT cust_id
+FROM orders
+WHERE order_num IN (SELECT order_num 
+                    FROM orderitems
+                   WHERE prod_id = 'TNT2');
+~~~
+
+在SELECT语句中，子查询总是从内向外处理。在处理上面的SELECT语句时，MySQL实际上执行了两个操作。
+
+首先，它执行了下面的查询：
+
+~~~mysql
+SELECT order_num FROM orderitems WHERE prod_id = 'TNT2';
+~~~
+
+此查询返回两个订单号20005和20007.然后这两个值以IN操作符要求的逗号分隔的格式传递给外部查询的WHERE子句。外部查询变成：
+
+~~~mysql
+SELECT cust_id FROM orders WHERE  order_num IN (20005,20007);
+~~~
+
+这样的结果与硬编码的WHERE子句所返回的值相同。
+
+**格式化SQL**：包含子查询的SELECT语句难以阅读和调试，特别是较为复杂时更是如此。如上所示把子查询分解为多行并且适当地进行缩进，能极大地简化子查询的使用 。
+
+**列必须匹配**：在WHERE子句中使用子查询（如这里所示），应该保证SELECT语句具有与WHERE子句中相同数目的列。通常，子查询将返回单个列并且与单个列匹配，但如果需要也可以使用多个列 。
+
+虽然子查询一般与IN操作符结合使用，但也可以用于测试等于（=）、不等于（<>）等。 
+
+**子查询和性能**：这里给出的代码有效并获得所需的结果。但是，使用子查询并不总是执行这种类型的数据检索的最有效的方法。 
+
+### 作为计算字段使用子查询
+
+使用子查询的另一方法是创建计算字段。假如需要显示customers表中每个客户的订单总数。订单与相应的客户ID存储在orders表中。 
