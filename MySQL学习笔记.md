@@ -1168,3 +1168,79 @@ SELECT cust_id FROM orders WHERE  order_num IN (20005,20007);
 ### 作为计算字段使用子查询
 
 使用子查询的另一方法是创建计算字段。假如需要显示customers表中每个客户的订单总数。订单与相应的客户ID存储在orders表中。 
+
+为了执行这个操作，遵循下面的步骤
+
+- 从customers表中检索客户列表
+- 对于检索出的每个客户，统计其在orders表中的订单数目
+
+如下，对客户10001的订单进行计数
+
+~~~mysql
+SELECT COUNT(*) AS orders
+FROM orders
+WHERE cust_id = 10001;
+~~~
+
+对每个客户执行COUNT(*)计算，应该将COUNT(*)作为一个子查询。
+
+~~~mysql
+SELECT cust_name,
+	   cust_state,
+	   (SELECT COUNT(*)
+         FROM orders
+         WHERE orders.cust_id = customers.cust_id) AS orders
+FROM customers
+ORDER BY cust_name;
+~~~
+
+这条SELECT语句对customers表中每个客户返回3列：cust_name、cust_state和orders。orders是一个计算字段，它是由圆括号中的子查询建立的。该子查询对检索出的每个客户执行一次。
+
+子查询中的WHERE子句与前面使用的WHERE子句稍有不同，因为它使用了完全限定列名。下面的语句告诉SQL比较orders表中的cust_id与当前正从customers表中检索的cust_id:
+
+~~~MYSQL
+WHERE orders.cust_id = customers.cust_id;
+~~~
+
+**相关子查询**：涉及外部查询的子查询
+
+任何时候只要列名可能有多义性，就必须使用这种语法（表名和列名由一个句点分隔）。如果不使用完全限定的列名时，如下：
+
+~~~mysql
+SELECT cust_name,
+       cust_state,
+       (
+           SELECT COUNT(*)
+           FROM orders
+           WHERE cust_id = cust_id
+       ) AS orders
+FROM customers
+ORDER BY cust_name;
+~~~
+
+这种语句是错误的。有两个cust_id列，一个在customers中，另一个在orders中，需要比较这两个列以正确地把订单与他们相应的顾客匹配。如果不完全限定列名，MySQL将假定你是对orders表中的cust_id进行自身比较。而SELECT COUNT(*) FROM orders WHERE cust_id = cust_id;总是返回orders表中的订单总数（因为MySQL查看每个订单的cust_id是否与自身匹配，当然，它们总是匹配的）。
+
+**逐渐增加子查询来建立查询**：用子查询测试和调试查询很有技巧性，特别是在这些语句的复杂性不断增加的情况下更是如此。用子查询建立（和测试）查询的最可靠的方法是逐渐进行。首先，建立和测试最内层的查询。然后，用硬编码数据建立和测试外层查询，并且仅在确认它正常后才嵌入子查询。这时，再次测试它。对于要增加的每个查询，重复这些步骤。这样做仅给构造查询增加了一点点时间，但节省了以后（找出查询为什么不正常）的大量时间，并且极大地提高了查询一开始就正常工作的可能性。
+
+---
+
+## 联结表
+
+SQL最强大的功能之一就是能在数据检索查询的执行中联结（join）表。联结是利用SQL的SELECT能执行的最重要的操作，很好地理解联结及其语法是学习SQL的一个极为重要的组成部分。
+
+### 关系表
+
+关系表的设计就是要保证把信息分解成多个表，一类数据一个表。各表通过某些常用的值（即关系设计中的关系）互相关联。
+
+**外键**：外键为某个表中的一列，它包含另一个表的主键值，定义了两个表之间的关系。
+
+这样做的好处如下：
+
+- 信息不重复，从而不浪费时间和空间
+- 如果某一个信息变动，可以只更新对应表的单个记录，相关表中的数据不用改动
+- 由于数据无重复，显然数据是一致的，这使得处理数据不用改动
+
+**可伸缩性**：能够适应不断增加的工作量而不失败。设计良好的数据库或应用程序称之为可伸缩性好。
+
+
+
