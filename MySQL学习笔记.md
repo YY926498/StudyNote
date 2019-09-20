@@ -1468,3 +1468,111 @@ ON customers.cust_id = orders.cust_id
 GROUP BY customers.cust_id;
 ~~~
 
+这个例子使用左外部联结来包含所有客户，甚至包含那些没有任何下订单的客户。
+
+### 使用联结和联结条件
+
+- 注意所使用的联结类型。一般我们使用内部联结，但使用外部联结也是有效的。
+- 保证使用正确的联结条件，否则将返回不正确的数据。
+- 应该总是提供联结条件，否则会出现笛卡尔积。
+- 在一个联结中可以包含多个表，甚至对于每个联结可以采用不同的联结类型。虽然这样做事合法的，一般也很有用，但应该在一起测试它们前，分别测试每个联结。这将使故障排除更为简单。
+
+## 组合查询
+
+执行多个查询（多条SELECT语句），并将结果作为单个查询结果集返回。这些组合通常被称为并或复合查询。可能用到的情况如下：
+
+- 在单个查询中从不同的表返回类似结构的数据。
+- 对单个表执行多个查询，按单个查询返回数据。
+
+**组合查询和多个WHERE条件**： 多数情况下，组合相同表的两个查询完成的工作与具有多个WHERE子句条件的单条查询完成的工作相同。换句话说，任何具有多个WHERE子句的SELECT语句都可以作为一个组合查询给出，在以下段落中可以看到这一点。这两种技术在不同的查询中性能也不同。因此，应该试一下这两种技术，以确定对特定的查询哪一种性能更好。
+
+### 创建组合查询
+
+用UNION操作符来组合数条SQL查询。
+
+#### 使用UNION
+
+给出每条SELECT语句，在各条语句之间放上关键字UNION。
+
+假如需要价格小于等于5的所有物品的一个列表，而且还想包括供应商1001和1002生产的所有物品。
+
+~~~mysql
+SELECT vend_id, prod_id,prod_price
+FROM products
+WHERE prod_price <= 5;
+~~~
+
+~~~mysql
+SELECT vend_id, prod_id, prod_price
+FROM products
+WHERE vend_id IN(1001,1002);
+~~~
+
+第一条SELECT检索价格不高于5的所有物品。第二条SELECT使用IN找出供应商1001和1002生产的所有物品。组合查询如下：
+
+~~~mysql
+SELECT vend_id, prod_id,prod_price
+FROM products
+WHERE prod_price <= 5
+UNION 
+SELECT vend_id, prod_id, prod_price
+FROM products
+WHERE vend_id IN (1001,1002);
+~~~
+
+UNION指示MySQL执行两条SELECT语句，并把输出合并成单个查询结果集。使用多条WHERE子句如下：
+
+~~~mysql
+SELECT vend_id,prod_id,prod_price
+FROM products
+WHERE prod_price <= 5
+OR vend_id IN (1001,1002);
+~~~
+
+在这里，使用UNION可能比使用WHERE子句更为复杂，但是更复杂的过滤条件，或者从多个表中检索数据时，使用UNIION可能会使处理更简单。
+
+#### UNION规则
+
+- UNION必须由两条或两条以上的SELECT语句组成，语句之间用关键字UNION分隔（因此，如果组合4条SELECT语句，必须使用3个UNION关键字）。
+- UNION中的每个查询必须包含相同的列、表达式或聚集函数（不过各个列不需要以相同的次序列出）。
+- 列数据类型必须兼容：类型不必完全相同，但必须是DBMS可以隐含地转换的类型。
+
+#### 包含或取消重复的行
+
+UNION从查询结果集中自动去除了重复的行。这是UNION默认行为，如果需要保留重复的行，可以使用UNION ALL。
+
+~~~mysql
+SELECT vend_id,prod_id,prod_price
+FROM products
+WHERE prod_price <= 5
+UNION ALL
+SELECT vend_id, prod_id,prod_price
+FROM products
+WHERE vend_id IN (1001,1002);
+~~~
+
+**UNION与WHERE**：UNION几乎总是完成与多个WHERE条件相同的工作。UNION ALL为UNION的一种形式，它完成WHERE子句完成不了的工作。如果确实需要每个条件的匹配行全部出现（包括重复行），则必须使用UNION ALL而不是WHERE。
+
+#### 对组合查询结果进行排序
+
+SELECT语句的输出用ORDER BY子句排序。在用UNION组合查询时，只能使用ORDER BY子句，它必须出现在最后一条SELECT语句之后。对于结果集，不存在用一种方式排序一部分，而又使用另一种方式排序另一部分的情况，因此不允许使用多条ORDER BY子句。
+
+~~~mysql
+SELECT vend_id,prod_id,prod_price
+FROM products
+WHERE prod_price <= 5
+UNION 
+SELECT vend_id, prod_id,prod_price
+FROM products
+WHERE vend_id IN (1001,1002)
+ORDER BY vend_id,prod_price;
+~~~
+
+MySQL将用最后一条ORDER BY子句对所有SELECT语句返回的结果进行排序。
+
+UNION可以组合不同的表。
+
+---
+
+## 全文本搜索
+
