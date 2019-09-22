@@ -1605,3 +1605,72 @@ CREATE TABLE productnotes
 )ENGINE = MyISAM;
 ~~~
 
+这条CREATE TABLE语句定义表productnotes并列出它所包含的列即可。这些列中有一个名为note_text的列，为了进行全文本搜索，MySQL根据子句FULLTEXT(note_text)的指示对它进行索引。这里只索引一个列，也可以索引多个列。
+
+**不要在导入数据时使用FULLTEXT**：更新索引需要花点时间，虽然不是很多，但毕竟要时间。如果正在导入数据到一个新表，此时不应该启用FULLTEXT索引。应该首先导入所有数据，然后再修改表，定义FULLTEXT。这样有助于更快地导入数据（而且使索引数据的总时间小于在导入每行时分别进行索引所需的总时间。
+
+#### 进行全文本搜索
+
+在索引之后，使用两个函数Match()和Against()执行全文本搜索，其中Match()指定被搜索的列，Against()指定要使用的搜索表达式。
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('rabbit');
+~~~
+
+此SELECT语句检索单个列note_text。由于WHERE子句，一个全文本搜索被执行。Match(note_text)指示MySQL针对指定的列进行搜索，Against(‘rabbit’)指定词rabbit作为搜索文本。
+
+**使用完整的Match()说明**：传递给Match()的值必须与FULLTEXT()定义中的相同。如果指定多个列，则必须列出它们（而且次序正确）。
+
+**搜索不区分大小写**：除非使用BINARY，否则全文本搜索不区分大小写。
+
+上述语句可用LIKE达成同样的目的：
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE note_text LIKE '%rabbit%';
+~~~
+
+但是使用全文本搜索，将返回以文本匹配的良好程度排序的数据。全文本搜索的一个重要的部分就是对结果排序。具有较高等级的行先返回。
+
+演示排序：
+
+~~~MYSQL
+SELECT note_text
+	   Match(note_text) Against('rabbit') AS rank
+FROM productnotes;
+~~~
+
+在SELECT而不是WHERE子句中使用Match()和Against()。这使所有行都被返回。
+
+**排序多个搜索项**：如果指定多个搜索项，则包含多数匹配词的那些行将具有比包含较少词（或仅有一个匹配）的那些行高的等级值。
+
+#### 使用查询扩展
+
+查询扩展用来设法放宽所返回的全文本搜索结果的范围。
+
+在使用查询扩展时，MySQL对数据和索引进行两遍扫描来完成搜索。
+
+- 进行一个基本的全文本搜索，找出与搜索条件匹配的所有行；
+- 其次，MySQL检查这些匹配行并选择所有有用的词
+- 再其次，MySQL再次进行全文本搜索，这次不仅使用原来的条件，而且使用所有有用的词。
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('anvils' WITH QUERY EXPANSION);
+~~~
+
+#### 布尔文本搜索
+
+全文本搜索的一种形式：布尔方式
+
+- 要匹配的词
+- 要排斥的词（如果某行包含这个词，则不返回该行，即使它包含其他指定的词也是如此）
+- 排列提示（指定某些词比其他词更重要，更重要的词等级更高）
+- 表达式分组
+- 另外一些内容
+
+**即使没有FULLTEXT**
