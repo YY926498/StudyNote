@@ -1673,4 +1673,212 @@ WHERE Match(note_text) Against('anvils' WITH QUERY EXPANSION);
 - 表达式分组
 - 另外一些内容
 
-**即使没有FULLTEXT**
+**即使没有FULLTEXT索引也可以使用**：即使没有定义FULLTEXT索引，也可以使用它。但这是一种非常缓慢的操作。
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('heavy' IN BOOLEAN MODE);
+~~~
+
+此全文本搜索检索包含词heavy的所有行。其中使用关键字IN BOOLEAN MODE，但实际上没有指定布尔操作符，因此，其结果与没有指定布尔方式的结果相同。
+
+为了匹配包含heavy但不包含任意以rope开始的词的行，使用以下查询：
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('heavy -rope*' IN BOOLEAN MODE);
+~~~
+
+其中-rope\*明确地指示MySQL排除包含rope*(任何以rope开始的词)的行。
+
+全文本搜索布尔操作符：
+
+| 布尔操作符 |                             说明                             |
+| :--------: | :----------------------------------------------------------: |
+|     +      |                       包含，词必须存在                       |
+|     -      |                      排除，词必须不出现                      |
+|     >      |                     包含，而且增加等级值                     |
+|     <      |                     包含，而且减少等级值                     |
+|     ()     | 把词组成子表达式（允许这些子表达式作为一个组被包含、排除、排列等） |
+|     ~      |                      取消一个词的排序值                      |
+|     *      |                         词尾的通配符                         |
+|     “”     | 定义一个短语（与单个词的列表不一样，它匹配整个短语以便包含或排除这个短语 |
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('+rabbit +bait' IN BOOLEAN MODE);
+~~~
+
+这个搜索匹配包含词rabbit和bait的行
+
+~~~MYSQL
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('rabbit bait' IN BOOLEAN MODE);
+~~~
+
+没有指定操作符，这个搜索匹配rabbit和bait中的至少一个词。
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('"rabbit bait"' IN BOOLEAN MODE);
+~~~
+
+这个搜索匹配短语rabbit bait而不是匹配两个词rabbit和bait。
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('>rabbit <carrot' IN BOOLEAN MODE);
+~~~
+
+匹配rabbit和carrot，增加前者的等级，降低后者的等级。
+
+~~~mysql
+SELECT note_text
+FROM productnotes
+WHERE Match(note_text) Against('+safe +(<combination)' IN BOOLEAN MODE);
+~~~
+
+这个搜索匹配词safe和combination，降低后者的等级。
+
+**排列而不排序**：在布尔方式中，不按等级值降序排序返回的行。
+
+#### 全文本搜索的使用说明
+
+- 在索引全文本数据时，短词被忽略且从索引中排除。短词定义为那些具有3个或3个以下字符的词（如果需要，这个数目可以更改）。
+- MySQL带有一个内建的非用词（stopword)列表，这些词在索引全文本数据时总是被忽略的。如果需要，可以覆盖这个列表。
+- 许多词出现的频率很高，搜索它们没有用处（返回太多的结果）。因此，MySQL规定了一条50%规则，如果一个词出现在50%以上的行中，则将它作为一个非用词忽略。50%规则不用于IN BOOLEAN MODE。
+- 如果表中的行数少于3行，则全文本搜索不返回结果（因此每个词或者不出现，或者至少出现在50的行中）。
+- 忽略词中的单引号。例如，don’t索引dont
+- 不具有词分隔符（包括日语和汉语）的语言不能恰当地返回全文本搜索结果。
+- 仅在MyISAM数据库引擎中支持全文本搜索。
+
+---
+
+## 插入数据
+
+INSERT是用来插入（或添加）行到数据库表的。插入可以用几种方式使用：
+
+- 插入完整的行
+- 插入行的一部分
+- 插入多行
+- 插入某些查询的结果
+
+**插入及系统安全**：可针对每个表或每个用户，利用MySQL的安全机制禁止使用INSERT语句。
+
+### 插入完整的行
+
+把数据插入表中的最简单的方法是使用基本的INSERT语法，它要求指定表名和被插入的新行中的值。
+
+~~~MYSQL
+INSERT INTO Customers
+VALUES(NULL,
+      'Pep E. LaPew',
+      '100 Main Street',
+      'LOS Angeles',
+      'CA',
+      '90046',
+      'USA',
+      NULL,
+      NULL);
+~~~
+
+**没有输出**：INSERT语句一般不会产生输出
+
+此例子插入一个新客户到customers表。存储到每个表列中的数据在VALUES子句中给出，对每个列必须提供一个值。如果某个列没有值，应该使用NULL值（假定表允许对该列指定空值）。各个列必须以它们在表定义中出现的次序填充。第一列为NULL值，这是因为每次插入一个新行时，该列有MySQL自动增量。不想给出一个值（这是MySQL的工作），但又不能省略该列，所以指定一个NULL值（它被MySQL忽略，MySQL在这里插入下一个可用的cust_id值）。
+
+这种语法很简单，但是不安全，应该尽量避免使用。高度依赖表中列的定义次序，并且还依赖其次序容易获得的信息。更安全的方法如下：
+
+~~~mysql
+INSERT INTO customers(
+    cust_name,
+    cust_address,
+	cust_city,
+	cust_state,
+    cust_zip,
+    cust_country,
+    cust_contact,
+    cust_email
+)
+VALUES(
+    'Pep E. LaPew',
+    '100 Main Street',
+    'Los Angles',
+    'CA',
+    '90046',
+    'USA',
+    NULL,
+    NULL
+);
+~~~
+
+这个例子与上面的例子完全相同，但是在表名后的括号里明确地给出了列名。在插入行时，MySQL将用VALUES列表中的相应值填入列表中的对应项。VALUES中的第一个值对应于第一个指定的列名。
+
+**总是使用列的列表**：一般不要使用没有明确给出列的列表的INSERT语句。使用列的列表能使SQL代码继续发挥作用，即使表结构发生了变化。
+
+**省略列**：如果表的定义允许，则可以在INSERT操作中省略某些列。省略的列必须满足以下条件：
+
+- 该列定义为允许NULL值（无值或空值）。
+- 在表定义中给出默认值。这表示如果不给出值，将使用默认值。
+
+**提高整体性能**：INSERT操作可能很耗时，而且可能降低等待处理的SELECT语句的性能。如果数据检索是最重要的，则可以通过在INSERT和INTO之间添加关键字LOW_PRIORITY，指示MySQL降低INSERT语句的优先级，如下示例
+
+~~~mysql
+INSERT LOW_PRIORITY INTO
+~~~
+
+这也适用于UPDATE和DELETE语句。
+
+### 插入多个行
+
+使用多条INSERT语句，甚至一次提交，每个语句用一个分号结束。
+
+~~~mysql
+INSERT INTO customers(
+    cust_name,
+    cust_address,
+	cust_city,
+	cust_state,
+    cust_zip,
+    cust_country,
+    cust_contact,
+    cust_email
+)
+VALUES(
+    'Pep E. LaPew',
+    '100 Main Street',
+    'Los Angles',
+    'CA',
+    '90046',
+    'USA',
+    NULL,
+    NULL
+);
+INSERT INTO customers(
+    cust_name,
+    cust_address,
+	cust_city,
+	cust_state,
+    cust_zip,
+    cust_country,
+    cust_contact,
+    cust_email
+)
+VALUES(
+    'M. Martian',
+    '42 Galaxy Way',
+    'New York',
+    'NY',
+    '11213',
+    'USA',
+    NULL,
+    NULL
+);
+~~~
+
+或者，只要每条INSERT
