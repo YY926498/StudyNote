@@ -1881,4 +1881,188 @@ VALUES(
 );
 ~~~
 
-或者，只要每条INSERT
+或者，只要每条INSERT语句中的列名（和次序）相同，可以如下组合各语句：
+
+~~~mysql
+INSERT INTO customers(
+    cust_name,
+    cust_address,
+	cust_city,
+	cust_state,
+    cust_zip,
+    cust_country,
+    cust_contact,
+    cust_email
+)
+VALUES(
+    'Pep E. LaPew',
+    '100 Main Street',
+    'Los Angles',
+    'CA',
+    '90046',
+    'USA',
+    NULL,
+    NULL
+)，
+(
+    'M. Martian',
+    '42 Galaxy Way',
+    'New York',
+    'NY',
+    '11213',
+    'USA',
+    NULL,
+    NULL
+);
+~~~
+
+其中单条INSERT语句有多组值，每组值用一对圆括号括起来，用逗号分隔。
+
+**提高INSERT的性能**：单条INSERT语句处理多个插入比使用多条INSERT语句快。
+
+### 插入检索出的数据
+
+INSERT SELECT：将一条SELECT语句的结果插入表中。在插入时，不应该出现重复的主键值，如果主键值重复，后续的INSERT操作将会失败，或仅省略这列值让MySQL在导入数据的过程中产生新值。
+
+~~~mysql
+INSERT INTO customers(
+    cust_name,
+    cust_address,
+	cust_city,
+	cust_state,
+    cust_zip,
+    cust_country,
+    cust_contact,
+    cust_email
+)
+SELECT cust_name,
+    cust_address,
+	cust_city,
+	cust_state,
+    cust_zip,
+    cust_country,
+    cust_contact,
+    cust_email
+FROM custnew;	
+~~~
+
+这个例子使用INSERT SELECT从custnew中将所有数据导入customers。SELECT语句从custnew检索出要插入的值，而不是列出它们。SELECT中列出的每个列对应于custnew表名后所跟的列表中的每个列。
+
+**INSERT SELECT中的列名**：不一定要求列名匹配。MySQL不关心SELECT返回的列名。它使用的是列的位置，因此SELECT中的第一列将用来填充表列中的第一列。
+
+INSERT SELECT中的SELECT语句可包含WHERE子句以过滤插入的数据。
+
+---
+
+## 更新和删除数据
+
+### 更新数据
+
+- 更新表中特定行
+- 更新表中的所有行
+
+**不要省略WHERE子句**：在使用UPDATE时，一定要注意细心。因为稍不注意，就会更新表中的所有行。
+
+UPDATE语句由三部分组成：
+
+- 要更新的表
+- 列名和他们的新值
+- 确定要更新行的过滤条件
+
+~~~mysql
+UPDATE customers
+SET cust_email = 'elmer@fudd.com'
+WHERE cust_id = 10005;
+~~~
+
+UPDATE语句总是以要更新的表的名字开始。SET命令用来将新值赋给被更新的列。
+
+更新多个列的语法：
+
+~~~mysql
+UPDATE customers
+SET cust_name = 'The fudds',
+	cust_email = 'elmer@fuss.com'
+WHERE cust_id = 10005;
+~~~
+
+在更新多个列时，只需要使用单个SET命令，每个“列=值”对之间用逗号分隔（最后一列不用逗号）。
+
+**在UPDATE语句中使用子查询**：UPDATE语句中可以使用子查询，使得能用SELECT语句检索出的数据更新列数据。
+
+**IGNORE关键字**：如果用UPDATE语句更新多行，并且在更新这些行中的一行或多行时发生一个错误，则整个UPDATE操作被取消（错误发生前更新的行被恢复到它们原来的值）。为即使是发生错误，也继续进行更新，可使用IGNORE关键字。UPDATE IGNORE customers…。
+
+为了删除某个列的值，可设置它为NULL值。（加入表定义允许NULL值）。
+
+~~~mysql
+UPDATE customers
+SET cust_email = NULL
+WHERE cust_id = 10005;
+~~~
+
+### 删除数据
+
+- 从表中删除特定的行
+- 从表中删除所有行
+
+~~~mysql
+DELETE FROM customers WHERE cust_id = 10006;
+~~~
+
+DELETE FROM要求指定从中删除数据的表名。WHERE子句过滤要删除的行。DELETE不需要列名或通配符。DELETE删除整行而不是删除列。为了删除指定的列，使用UPDATE。
+
+**删除表的内容而不是删除表**：DELETE语句从表中删除行，甚至是删除表中的所有行。但是，DELETE不删除表本身。
+
+**更快的删除**：如果想删除所有行，不要使用DELETE。使用TRUNCATE TABLE语句，它完成相同的工作，但速度更快（TRUNCATE实际是删除原来的表并重新创建一个新表，而不是逐行删除表中的数据）。
+
+### 更新和删除的指导原则
+
+- 除非确实打算更新和删除每一行，否则绝对不要使用不带WHERE子句的UPDATE或DELETE语句。
+- 保证每个表都有主键，尽可能像WHERE子句那样使用它（可以指定各主键、多个值或值的范围）。
+- 在对UPDATE或DELETE语句使用WHERE子句前，应该先用SELECT进行测试，保证它过滤的是正确的记录，以防编写的WHERE子句不正确。
+- 使用强制实施引用完整性的数据库，这样MySQL将不允许删除具有与其他表相关联的数据的行。
+
+---
+
+## 创建和操纵表
+
+### 创建表
+
+#### 表创建基础
+
+为利用CREATE TABLE创建表，必须给出下列信息：
+
+- 新表的名字，在关键字CREATE TABLE之后给出
+- 表列的名字和定义，用逗号分隔
+
+~~~mysql
+CREATE TABLE customers
+(
+    cust_id			int			NOT NULL AUTO_INCREMENT,
+    cust_name		char(50)	NOT NULL,
+    cust_address	char(50)	NULL,
+    cust_city		char(50)	NULL,
+    cust_state		char(50)	NULL,
+    cust_zip		char(50)	NULL,
+    cust_country	char(50)	NULL,
+    cust_email		char(255)	NULL,
+    PRIMARY KEY(cust_id)
+)ENGINE=InnoDB;
+~~~
+
+表名紧跟在CREATE TABLE关键字之后。实际的表定义（所有列）括在圆括号之中。各列之间用逗号分隔。这个表由8列组成。每列的定义及列名（它在表中必须是唯一的）开始，后跟列的数据类型。表的主键可以在创建表时使用PRIMARY KEY关键字指定。这里，指定列cust_id为主键列。整条语句由右圆括号后的分号结束。
+
+**处理现有的表**：在创建新表时，指定的表名必须不存在，否则将会出错。如果要防止意外覆盖已有的表，SQL要去首先手工删除该表，然后再重建它，而不是简单用创建表语句覆盖它。如果仅想在表不存在时创建它，应该在表名后给出IF NOT EXISTS。
+
+~~~MYSQL
+CREATE TABLE IF NOT EXISTS customers
+(
+    cust_id			int			NOT NULL AUTO_INCREMENT,
+    PRIMARY KEY(cust_id)
+)ENGINE=InnoDB;
+~~~
+
+这样就会提示已经创建表了。
+
+#### 使用NULL值
+
