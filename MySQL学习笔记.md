@@ -2066,3 +2066,340 @@ CREATE TABLE IF NOT EXISTS customers
 
 #### 使用NULL值
 
+NULL值就是没有值或者缺值。允许NULL值得列也允许在插入行时不给出该列的值。不允许NULL值得列不接受该列没有值的行，换句话说，在插入行或更新行时，该列必须有值。
+
+每个表列或者是NULL列，或者是NOT NULL列，这种状态在创建时由表的定义规定。
+
+~~~mysql
+CREATE TABLE orders
+(
+    order_num		int			NOT NULL	AUTO_INCREMENT,
+    order_date		datetime	NOT NULL,
+    cust_id			int			NOT NULL,
+    PRIMARY KEY(order_num)
+)ENGINE=InnoDB;
+~~~
+
+这条语句创建本书中所用的orders表。orders表包含3个列，分别是订单号、订单日期和客户ID。所有3个列都需要，因此每个列的定义都含有关键字NOT NULL。这将会阻止插入没有值得列。如果试图插入没有值的列，将返回错误，且插入失败。
+
+~~~mysql
+CREATE TABLE vendors
+(
+    vend_id			int			NOT NULL AUTO_INCREMENT,
+    vend_name		char(50)	NOT NULL,
+    vend_address	char(50)	NULL,
+    vend_city		char(50)	NULL,
+    PRIMARY KEY(vend_id)
+)ENGINE=InnoDB;
+~~~
+
+**理解NULL**：NULL值不是空串。NULL值时没有值，它不是空串。如果指定‘ ’（两个单引号，其间没有字符），这在NOT NULL列中是允许的。空串是一个有效的值，它不是无值。NULL值用关键字NULL而不是空串指定。
+
+#### 主键再介绍
+
+主键值必须是唯一的。表中的每一行必须具有唯一的主键值。如果主键使用单个列，则它的值必须唯一。如果使用多个列，则这些的列的组合值必须是唯一的。
+
+多个列作为主键;
+
+~~~mysql
+CREATE TABLE orderitems
+(
+    order_num 		int			NOT NULL,
+    order_item		int 		NOT NULL,
+    prod_id			char(10)	NOT NULL,
+    PRIMARY KEY(order_num,order_item)
+)ENGINE=InnoDB;
+~~~
+
+主键可以在创建表时定义，或者在创建表之后定义。
+
+**主键和NULL值**：主键只能使用不允许NULL值得列。允许NULL值得列不能作为唯一标识。
+
+#### 使用AUTO_INCREMENT
+
+AUTO_INCREMENT告诉MySQL，本列每当增加一行时自动增量。每次执行一个INSERT操作时，MySQL自动对该列增量（从而才有这个关键字AUTO_INCREMENT），给该列赋予下一个可用的值。这样给每个行分配一个唯一的值，从而可以用作主键值。
+
+每个表只允许一个AUTO_INCREMENT列，而且它必须被索引。
+
+**覆盖AUTO_INCREMENT**：如果一个列被指定为AUTO_INCREMENT，可以简单地在INSERT语句中指定一个值，只要它是唯一的（至今尚未使用过）即可，该值将被用来替代自动生成的值。后续的增量将开始使用该手工插入的值。
+
+**确定AUTO_INCREMENT的值**：使用AUTO_INCREMENT列时，获得最新的值，可以使用last_insert_id()函数，示例：
+
+~~~mysql
+SELECT last_insert_id();
+~~~
+
+#### 指定默认值
+
+如果在插入行时没有给出值，MySQL允许指定此时使用的默认值。默认值用CREATE TABLE语句的列定义中的DEFAULT关键字指定。
+
+~~~mysql
+CREATE TABLE orderitems
+(
+    order_num		int 		NOT NULL,
+    order_item		char(50)	NOT NULL DEFAULT '1';
+    PRIMARY KEY(order_num)
+)ENGINE=InnoDB;
+~~~
+
+这条语句创建一个orderitems表。其中列order_item有默认值‘1’。
+
+**不允许函数**：MySQL不允许使用函数作为默认值，它只支持常量。
+
+**使用默认值而不是NULL值**。
+
+#### 引擎类型
+
+- InnoDB是一个可靠的事务处理引擎，它不支持全文本搜索；
+- MEMORY在功能等同于MyISAM，但由于数据存储在内存（不是磁盘）中，速度很快（特别适合于临时表）；
+- MyISAM是一个性能极高的引擎，它支持全文本搜索，但不支持事务处理。
+
+引擎类型可以混用。
+
+**外键不能跨引擎**：混用引擎有一个大缺陷。外键（用于强制实施引用完整性）不能跨引擎，即使用一个引擎的表不能引用具有使用不同引擎的表的外键。
+
+### 更新表
+
+为更新表定义，可使用ALTER TABLE语句。但是，在理想状态下，当表中存储数据以后，该表不应该再被更新。
+
+- 在ALTER TABLE之后给出要更改的表名（该表必须存在，否则将会出错）；
+- 所做更改的列表
+
+~~~mysql
+ALTER TABLE vendors
+ADD vend_phone CHAR(20)；
+~~~
+
+这条语句给vendors表增加一个名为vend_phone的列，必须明确其数据类型。
+
+删除刚刚的列，可以这样做：
+
+~~~mysql
+ALTER TABLE vendors
+DROP COLUMN vend_phone;
+~~~
+
+ALTER TABLE的一种常见用途是定义外键。如下：
+
+~~~mysql
+ALTER TABLE orderitems
+ADD CONSTRAINT fk_orderitems_orders
+FOREIGN KEY (order_num) REFERENCES orders (order_num);
+
+ALTER TABLE orderitems
+ADD CONSTRAINT fk_orderitems_products
+FOREIGN KEY (prod_id) REFERENCES orders (prod_id);
+~~~
+
+这里，对同一个表使用了两次ALTER TABLE语句进行两次更改，但是可以使用单条ALTER TABLE语句，每个更改用逗号分隔。
+
+~~~mysql
+ALTER TABLE productnotes add prod_phone char(50), add cust_id char(50);
+~~~
+
+复杂的表结构更改一般需要手动删除过程，它涉及以下步骤：
+
+- 用新的列布局创建一个新表；
+- 使用INSERT SELECT语句从旧表复制数据到新表。如果有必要，可使用转换函数和计算字段；
+- 检验包含所需数据的新表；
+- 重命名旧表（如果确定，可以删除它）；
+- 用旧表原来的名字重命名新表；
+- 根据需要，重新创建触发器、存储过程、索引和外键。
+
+### 删除表
+
+删除整个表。使用DROP TABLE语句即可。
+
+~~~mysql
+DROP TABLE customers2;
+~~~
+
+这条语句删除customers2表。删除表没有确认，也不能撤销，执行这条语句将永久删除该表。
+
+### 重命名表
+
+使用RENAME TABLE语句可以重命名一个表
+
+~~~mysql
+RENAME TABLE customer2 TO customers;
+~~~
+
+将表customers2重命名为customers。
+
+~~~mysql
+RENAME TABLE backup_customers TO customers,
+			backup_vendors   TO vendors;
+~~~
+
+---
+
+## 使用视图
+
+### 视图
+
+视图是虚拟的表。只包含使用时动态检索数据的查询。
+
+视图的常见应用：
+
+- 重用SQL语句
+- 简化复杂的SQL操作。在编写查询后，可以方便地重用它而不必知道它的基本查询细节
+- 使用表的组成部分而不是整个表
+- 保护数据。可以给用户授予表的特定部分的访问权限而不是整个表的访问权限
+- 更改数据格式和表示。视图可返回与底层表的表示和格式不同的数据。
+
+视图仅仅是用来查看存储在别处的数据的一种设施。视图本身不包含数据，因此它们返回的数据是从其他表中检索出来的。在添加或更改这些表中的数据时，视图将返回改变过的数据。
+
+**性能问题**：因为视图不包含数据，所以每次检索数据时，都必须处理查询执行时所需的任一个检索。如果你用多个联结和过滤创建了复杂的视图或者嵌套了视图，可能会发现性能下降得很厉害。
+
+#### 视图的规则和限制
+
+- 与表一样，视图必须唯一命名
+- 对于可以创建的视图数目没有限制
+- 为了创建视图，必须具有足够的访问权限。
+- 视图可以嵌套，即可以利用从其他视图中检索数据的查询来构造一个视图。
+- ORDER BY可以用在视图中，但如果从该视图检索数据SELECT中也含有ORDER BY，那么该视图中的ORDER BY 将被覆盖。
+- 视图不能索引，也不能有关联的触发器或默认值
+- 视图可以和表一起使用。
+
+### 使用视图的方法
+
+- 视图用CREATE VEIW语句来创建
+- 使用SHOW CREATE VIEW viewname; 来查看创建视图的语句
+- 用DROP删除视图，其语法为DROP VIEW viewname;
+- 更新视图时，可以先用DROP再用CREATE，也可以直接用CREATE OR REPLACE VIEW。如果要更新的视图不存在，则第2条更新语句会创建一个视图；如果要更新的视图存在，则第2条更新语句会替换原有视图。
+
+#### 利用视图简化复杂的联结
+
+~~~MYSQL
+CREATE VIEW productcustomers AS 
+SELECT cust_name,cust_contact,prod_id
+FROM customers,orders,ordeitems
+WHERE customers.cust_id = orders.cust_id
+AND orderitems.order_num = orders.order_num;
+~~~
+
+这条语句创建一个名为productcustomers的视图，它联结三个表，以返回已订购了任意客产品的所有客户的列表。如果执行SELECT * FROM productcustomers;将列出订购了任意产品的客户。
+
+~~~mysql
+SELECT cust_name,cust_contact
+FROM productcustomers
+WHERE prod_id = 'TNT2';
+~~~
+
+这条语句通过WHERE子句从视图中检索特定数据。在MySQL处理此查询时，它将指定的WHERE子句添加到视图查询中的已有WHERE子句中，以便正确过滤数据。
+
+#### 用视图重新格式化检索出的数据
+
+~~~mysql
+SELECT Concat(RTrim(vend_name),'(',RTrim(vend_country),')')
+AS vedn_title
+FROM vendors
+ORDER BY vend_name;
+~~~
+
+假如经常需要重用这个格式的结果。不必在每次需要时执行廉洁，创建一个视图，每次需要它时使用它即可：
+
+~~~mysql
+CREATE VIEW vendorlocations AS
+SELECT Concat(RTrim(vend_name),'(',RTrim(vend_country),')')
+AS vedn_title
+FROM vendors
+ORDER BY vend_name;
+~~~
+
+如果想达成目的，如下：
+
+~~~mysql
+SELECT * FROM vendorlocations;
+~~~
+
+#### 用视图过滤不想要的数据
+
+~~~mysql
+CREATE VIEW customeremaillist AS
+SELECT cust_id,cust_name,cust_email
+FROM customers
+WHERE cust_email IS NOT NULL;
+~~~
+
+~~~mysql
+SELECT * FROM customeremaillist;
+~~~
+
+**WHERE子句与WHERE子句**：如果从视图检索数据时使用了一条WHERE子句，则两组子句（一组在视图中，另一组是传递给视图的）将自动组合。
+
+#### 使用视图与计算字段
+
+~~~mysql
+SELECT 	prod_id,
+		quantity,
+		item_price,
+		quantity*item_price AS enpanded_price
+FROM 	orderitems
+WHERE	order_num=20005;
+~~~
+
+将其转换为视图：
+
+~~~mysql
+CREATE VIEW orderitemsexpanded AS
+SELECT 	prod_id,
+		quantity,
+		item_price,
+		quantity*item_price AS enpanded_price
+FROM 	orderitems;
+~~~
+
+为检索订单20005的详细内容，如下;
+
+~~~mysql
+SELECT *
+FROM orderitemsexpanded
+WHERE order_num = 20005;
+~~~
+
+#### 更新视图
+
+如果视图中有以下操作，则不能进行视图的更新：
+
+- 分组（使用GROUP BY和HAVING）
+- 联结
+- 子查询
+- 并
+- 聚集函数
+- DISTINCT
+- 导出列
+
+视图主要是数据检索。
+
+---
+
+## 使用存储过程
+
+### 存储过程
+
+好处：简单、安全和高性能。
+
+### 使用存储过程
+
+称存储过程的执行为调用，因此MySQL执行存储过程的语句称为CALL。CALL接受存储过程的名字以及需要传递给它的任意参数。
+
+~~~mysql
+CALL productpricing(
+    @pricelow,
+    @pricehigh,
+    @priceaverage
+);
+~~~
+
+#### 创建存储过程
+
+~~~mysql
+CREATE PROCEDURE productpricing()
+BEGIN
+	SELECT Avg(prod_price) AS priceaverage
+	FROM products;
+END;
+~~~
+
+用CREATE PROCEDURE productpricing()语句定义。如果存储过程接受参数，它们将在()列举出来。此存储过程没有参数，但后跟的（）仍然需要。BEGIN和END语句用来限定存储过程体，过程体本身是一个简单的SELECT语句。
