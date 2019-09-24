@@ -2403,3 +2403,254 @@ END;
 ~~~
 
 用CREATE PROCEDURE productpricing()语句定义。如果存储过程接受参数，它们将在()列举出来。此存储过程没有参数，但后跟的（）仍然需要。BEGIN和END语句用来限定存储过程体，过程体本身是一个简单的SELECT语句。
+
+**MySQL命令行客户机的分隔符**：由于默认的MySQL语句的分隔符为;。MySQL命令行实用程序也使用;作为语句分隔符。如果命令行实用程序要解释存储过程自身内的;字符，则他们最终不会成为存储过程的成分，这会使存储过程中的SQL出现句法错误。
+
+解决办法是临时更改命令行实用程序的语句分隔符，如下所示：
+
+~~~mysql
+DELIMITER //
+CREATE PROCEDURE productpricing()
+BEGIN
+	SELECT Avg(prod_price) AS priceaverage
+	FROM products;
+END //
+DELIMITER ;
+~~~
+
+其中，DELIMITER // 告诉实用程序使用//作为新的语句分隔符。除 \ 符号外，任何字符都可以用作语句分隔符。
+
+使用上述的存储过程：
+
+~~~mysql
+CALL productpricing();
+~~~
+
+执行刚创建的存储过程并显示返回的结果。
+
+#### 删除存储过程
+
+~~~mysql
+DROP PROCEDURE productpricing;
+~~~
+
+**仅当存在时删除**：如果指定的过程不存在，则DROP PROCEDURE将 产生一个错误。当过程存在想删除它时（如果过程不存在也不产生错误）可使用DROP PROCEDURE IF EXISTS。
+
+#### 使用参数
+
+一般存储过程不显示结果，而是把结果返回给指定的变量。
+
+~~~mysql
+CREATE PROCEDURE productpricing(
+    OUT	pl	DECIMAL(8,2),
+    OUT	ph	DECIMAL(8,2),
+    OUT	pa	DECIMAL(8,2)
+)
+BEGIN
+	SELECT Min(prod_price)
+	INTO pl
+	FROM products;
+	SELECT Max(prod_price)
+	INTO ph
+	FROM products;
+	SELECT Avg(prod_price)
+	INTO pa
+	FROM products;
+END;
+~~~
+
+此存储过程接受3个参数：pl存储产品最低价格，ph接受产品最高价格，pa存储产品平均价格。每个参数必须具有指定的类型，这里使用十进制。关键字OUT指出相应的参数用来从存储过程传出一个值（返回给调用者）。MySQL支持IN（传递给存储过程）、OUT（从存储过程传出）和INOUT（对存储过程传入和传出）类型的参数。
+
+为调用此修改的存储过程，必须指定3个变量名，如下所示：
+
+~~~mysql
+CALL productpricing(
+    @pricelow,
+    @pricehigh,
+    @priceaverage
+)
+~~~
+
+**变量名**：所有MySQL变量都必须以@开始。
+
+为了显示检索出的产品平均价格，可如下：
+
+~~~mysql
+SELECT @priceaverage;
+~~~
+
+为了获得3个值，可使用如下语句：
+
+~~~mysql
+SELECT @pricehigh, @pricelow, @priceaverage;
+~~~
+
+下面使用IN和OUT参数：
+
+~~~mysql
+CREATE PROCEDURE ordertotal(
+    IN onumber INT,
+    OUT ototal DECIMAL(8,2)
+)
+BEGIN
+	SELECT Sum(item_price * quantity)
+	FROM orderitems
+	WHERE order_num = onumber
+	INTO ototal;
+END
+~~~
+
+onumber定义为IN，因为订单号被传入存储过程。ototal定义为OUT，因为要从存储过程中返回。
+
+~~~mysql
+CALL ordertotal(20005,@total);
+~~~
+
+#### 建立智能存储过程
+
+~~~mysql
+-- Name:ordertotal
+-- Parameters:		onumber = order number
+-- 				   taxable = 0 if not taxable, 1 if taxable
+-- 				   ototal  = order total variable
+cREATE PROCEDURE ordertotal(
+    	IN 		onumber INT,
+    	IN  	taxable BOOLEAN,
+    	OUT 	ototal	DECIMAL(8,2)
+) COMMENT 'Obtain order total, optionally adding tax'
+BEGIN
+	-- Declare variable for total
+	DECLARE total DECIMAL(8,2);
+	-- Declare tax percentage
+	DECLARE taxrate INT DEFAULT 6;
+	
+	-- Get the order total
+	SELECT Sum(item_price * quantity)
+	FROM orderitems
+	WHERE order_num = onumber
+	INTO total;
+	
+	-- Is this taxable?
+	IF taxable THEN
+		-- Yes, so add taxrate to the total
+		SELECT total+(total/100*taxrate) INTO total;
+	END IF;
+	-- And finally, save to out variable
+	SELECT total INTO ototal;
+END
+~~~
+
+此存储过程发生了很大变化。首先，增加了注释（前面放置了- -）。在存储过程体中，用DECLARE语句定义了两个局部变量。DECLARE要求指定变量名和数据类型，它也支持可选的默认值，这里taxrate默认是6。
+
+**COMMENT关键字**：COMMENT不是必需的，但如果给出，将在SHOW PROCEDURE STATUS的结果中显示。
+
+**IF语句**：IF语句还支持ELSEIF和ELSE子句（前者还使用THEN子句，后者不使用）。
+
+#### 检查存储过程
+
+为了显示用来创建一个存储过程的CREATE语句，使用SHOW CREATE PROCEDURE语句：
+
+~~~mysql
+SHOW CREATE PROCEDURE ordertotal;
+~~~
+
+**限制过程状态结果**：SHOW PROCEDURE STATUS列出所有存储过程。为限制其输出，可使用LIKE指定一个过滤模式，例如：
+
+~~~mysql
+SHOW PROCEDURE STATUS LIKE 'ordertotal';
+~~~
+
+---
+
+## 使用游标
+
+**游标**是一个存储在MySQL服务器上的数据库查询，它不是一条SELECT语句，而是被该语句检索出来的结果集。在存储了游标之后，应用程序可以根据需要滚动或浏览其中的数据。
+
+游标主要用于交互式应用，其中用户需要滚动屏幕上的数据，并对数据进行浏览或更改。
+
+**只能用于存储过程**：MySQL游标只能用于存储过程（和函数）。
+
+### 使用游标
+
+- 在能够使用游标前，必须声明（定义）它。这个过程实际上没有检索数据，它只是定义要使用的SELECT语句。
+- 一旦声明后，必须打开游标以供使用。这个过程用前面的SELECT语句把数据实际检索出来。
+- 对于填有数据的游标，根据需要取出（检索）各行。
+- 在结束游标使用时，必须关闭游标。
+
+#### 创建游标
+
+游标用DECLARE语句创建。DECLARE命名游标，并定义相应的SELECT语句，根据需要带WHERE和其他子句。
+
+~~~mysql
+CREATE PROCEDURE processorders()
+BEGIN
+	DECLARE ordernumers CURSOR
+	FOR
+	SELECT order_num FROM orders;
+END;
+~~~
+
+DECLARE语句用来定义和命名游标，这里为ordernumbers。存储过程处理完成后，游标就消失（因为它局限于存储过程）。
+
+#### 打开和关闭游标
+
+游标用OPEN CURSOR语句来打开;
+
+~~~mysql
+OPEN ordernumbers;
+~~~
+
+在处理OPEN语句时执行查询，存储检索出的数据以供浏览和滚动。
+
+游标处理完成后，应当使用如下语句关闭游标：
+
+~~~mysql
+CLOSE ordernumbers;
+~~~
+
+CLOSE释放游标使用的所有内部内存和资源，因此在每个游标不再需要时都应该关闭。
+
+**隐含关闭**：如果不明确关闭游标，MySQL将会在到达END语句时自动关闭它。
+
+~~~mysql
+CREATE PROCEDURE processorders()
+BEGIN
+	-- Declare the cursor
+	DECLARE ordernumbers CURSOR
+	FOR
+	SELECT order_num FROM orders;
+	
+	-- Open the cursor
+	OPEN ordernumbers;
+	
+	-- Close the cursor
+	CLOSE ordernumbers;
+END
+~~~
+
+#### 使用游标数据
+
+在一个游标被打开后，可以使用FETCH语句分别访问它的每一行。FETCH指定检索什么数据（所需的列），检索出来的数据存储在什么地方。它还向前移动游标中的内部行指针，使下一条FETCH语句检索下一行（不重复读取每一行）。
+
+~~~mysql
+CREATE PROCEDURE processorders()
+BEGIN
+	-- Declare local variable
+	DECLARE o INT;
+	
+	-- Declare the cursor
+	DECLARE ordernumbers CURSOR
+	FOR
+	SELECT order_num FROM orders;
+	
+	-- Open the cursor
+	OPEN ordernumbers;
+	
+	-- Get order number
+	FETCH ordernumbers INTO o;
+	
+	-- Close the cursor
+	CLOSE ordernumbers;
+END
+~~~
+
