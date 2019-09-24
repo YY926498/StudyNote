@@ -2651,6 +2651,185 @@ BEGIN
 	
 	-- Close the cursor
 	CLOSE ordernumbers;
-END
+END;
+~~~
+
+其中，FETCH用来检索当前行的order_num列（将自动从第一行开始）到一个名为o的局部声明的变量中。对检索出来的数据不做任何处理。
+
+在下一个例子中，循环检索数据，从第一行到最后一行：
+
+~~~MYSQL
+CREATE PROCEDURE processorders()
+BEGIN
+	-- Declare local variable
+	DECLARE done BOOLEAN DEFAULT 0;
+	DECLARE o INT;
+	
+	-- Declare the cursor
+	DECLARE ordernumbers CURSOR
+	FOR 
+	SELECT order_num FROM orders;
+	
+	-- Declare continue handler
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET done = 1;
+	
+	-- Open the cursor
+	OPEN ordernumbers;
+	
+	-- Loop through all rows
+	REPEAT
+		
+		-- Get order number
+		FETCH ordernumbers INTO o;
+	
+	-- End of loop
+	UNTIL done END REPEAT;
+	
+	-- Close the cursor
+	CLOSE ordernumbers;
+END;
+~~~
+
+这个例子使用FETCH检索当前order_num到声明的名为o的变量中。但与前一个例子不一样的是，这个例子中的FETCH是在REPEAT内，因此它反复执行直到done为真（由UNTIL done END REPEAT;规定）。为使它起作用，用一个DEFAULT 0定义变量done。那么根据下条语句：
+
+~~~mysql
+DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET done=1;
+~~~
+
+这条语句定义了一个CONTINUE HANDLER，它是在条件出现时被执行的代码。这里，它指出当SQLSTATE ‘02000’出现时，SET done=1。SQLSTATE ‘02000’是一个未找到条件，当REPEAT由于没有更多的行供循环而不能继续时，出现这个条件。
+
+**DECLARE语句的顺序**：DECLARE语句的发布存在特定的次序。用DECLARE语句定义的局部变量必须在定义任意游标或句柄之前定义，而句柄必须在游标之后定义。不遵守此顺序将发生错误信息。
+
+更进一步修改的版本：
+
+~~~mysql
+CREATE PROCEDURE processorders()
+BEGIN
+	-- Declare local variable
+	DECLARE done BOOLEAN DEFAULT 0;
+	DECLARE o INT;
+	DECLARE t DECIMAL(8,2);
+	
+	-- Declare the cursor
+	DECLARE ordernumbers CURSOR
+	FOR
+	SELECT order_num FROM orders;
+	-- Declare continue handler
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET done = 1;
+	
+	-- Create a table to store the results
+	CREATE TABLE IF NOT EXISTS ordertotals
+	(order_num INT, total DECIMAL(8,2));
+	
+	-- Open the cursor
+	OPEN ordernumbers;
+	
+	-- Loop through all rows
+	REPEAT 
+		-- Get order number
+		FETCH ordernumbers INTO o;
+		-- Get the total for this order
+		CALL ordertotal(o,1,t);
+		-- Insert order and total into ordertotals
+		INSERT INTO ordertotals(order_num,total)
+		VALUES(o,t);
+	-- End of loop
+	UNTIL done END REPEAT;
+	-- Close the cursor
+	CLOSE ordernumbers;
+END;
+~~~
+
+此存储过程不返回数据，但它能够创建和填充另一个表，，可以用一条简单的SELECT语句查看该表。
+
+---
+
+## 触发器
+
+触发器：在某个表发生更改时自动处理。触发器时MySQL响应以下任意一条语句自动执行的一条MySQL语句（或位于BEGIN和END语句之间的一组语句）。
+
+- DELETE
+- INSERT
+- UPDATE
+
+其他MySQL语句不支持触发器
+
+### 创建触发器
+
+在创建触发器时，需要给出4条信息：
+
+- 唯一的触发器名
+- 触发器关联的表
+- 触发器应该响应的活动
+- 触发器何时执行
+
+**保持每个数据库的触发器名唯一**：在MySQL中触发器名必须在每个表中唯一，但不是在每个数据库中唯一。这表示同一个数据库中的两个表可具有相同名字的触发器。这在其他每个数据库触发器名必须唯一的DBMS中是不允许的，而且以后的MySQL版本很可能会使命名规则更为严格。因此，最好在数据库范围内使用唯一的触发器名。
+
+触发器用CREATE TRIGGER语句创建。
+
+~~~mysql
+CREATE TRIGGER newproduct AFTER INSERT ON products
+FOR EACH ROW SELECT 'Product added';
+~~~
+
+CREATE TRIGGER用来创建名为newproduct的新触发器。触发器可在一个操作发生之前或之后执行，这里给出了AFTER INSERT，所以此触发器将在INSERT语句成功执行后执行。这个触发器还指定FOR EACH ROW，因此代码对每个插入行执行。在这个例子中，文本Product added将对每个插入的行显示一次。
+
+**仅支持表**：只有表才支持触发器，视图不支持（临时表也不支持）。
+
+触发器按每个表每个事件每次地定义，每个表每个事件每次只允许一个触发器。因此，每个表最多支持6个触发器（每条INSERT、UPDATE和DELETE的之前和之后）。单一触发器不能与多个事件或多个表关联。
+
+**触发器失败**：如果BEFORE触发器失败，则MySQL将不执行请求的操作。此外，如果BEFORE触发器或语句本身失败，MySQL将不执行AFTER触发器。
+
+### 删除触发器
+
+使用DROP TRIGGER语句;
+
+~~~mysql
+DROP TRIGGER newproduct;
+~~~
+
+触发器不能更新或覆盖。为了修改一个触发器，必须先删除它，然后再重新创建。
+
+### 使用触发器
+
+#### INSERT触发器
+
+INSERT触发器在INSERT语句执行之前湖之后执行。需要注以下几点：
+
+- 在INSERT触发器代码内，可引用一个名为NEW的虚拟表，访问被插入的行；
+- 在BEFORE INSERT触发器中，NEW的值也可以被更新（允许更改被插入的值）；
+- 对于AUTO_INCREMENT列，NEW在INSERT执行之前包含0，在INSERT执行之后包含新的自动生成值。
+
+如下：
+
+~~~mysql
+CREATE TRIGGER neworder AFTER INSERT ON orders
+FOR EACH ROW SELECT NEW.order_num;
+~~~
+
+此代码创建一个名为neworder的触发器，它按照AFTER INSERT ON orders执行。在插入一个新订单到orders表时，MySQL生成一个新订单号并保存到order_num中。触发器从NEW.order_num取得这个值并返回它。此触发器必须按照AFTER INSERT执行，因为在BEFORE INSERT语句执行之前，新order_num还没有生成。对于orders的每次插入使用这个触发器将总是返回新的订单号。
+
+测试这个触发器，试着插入新行，如下所示：
+
+~~~mysql
+INSERT INTO orders(order_date,cust_id)
+VALUES(Now(),10001);
+~~~
+
+在插入完成后，将自动返回新的order_num。
+
+**BEFORE或AFTER**：通常将BEFORE用于数据验证和净化（目的是保证插入表中的数据确实是需要的数据）。
+
+#### DELETE触发器
+
+- 在DELETE触发器代码内，可以引用一个名为OLD的虚拟表，访问被删除的行。
+- OLD中的值全都是只读的，不能更新
+
+~~~mysql
+CREATE TRIGGER deleteorder BEFORE DELETE ON orders
+FOR EACH ROW
+BEGIN
+	INSERT
+END;
 ~~~
 
