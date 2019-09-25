@@ -2829,7 +2829,120 @@ VALUES(Now(),10001);
 CREATE TRIGGER deleteorder BEFORE DELETE ON orders
 FOR EACH ROW
 BEGIN
-	INSERT
+	INSERT INTO archive_orders(order_num,order_date,cust_id)
+	VALUES(OLD.order_num,OLD.order_date,OLD.cust_id);
 END;
 ~~~
+
+在任意订单被删除前将执行此触发器。它使用一条INSERT语句将OLD中的值（要被删除的订单）保存到一个名为archive_orders的存档表中。
+
+使用BEFORE DELETE触发器的优点（相对于AFTER DELETE触发器来说）为，如果由于某种原因，订单不能存档，DELETE本身将被抛弃。
+
+#### UPDATE触发器
+
+- 在UPDATE触发器代码中，可以引用一个名为OLD的虚拟表访问以前（UPDATE语句前）的值，引用一个名为NEW的虚拟表访问新更新的值
+- 在BEFORE UPDATE触发器中，NEW中的值也能被更新（允许更改将要用于UPDATE语句中的值）
+- OLD中的值全都是只读的，不能更细。
+
+~~~mysql
+CREATE TRIGGER updatevendor BEFORE UPDATE ON vendors
+FOR EACH ROW SET NEW.vend_state = Upper(NEW.vend_state);
+~~~
+
+显然，任何数据净化都需要在UPDATE语句之前进行。每次更新一个行时，NEW.vend_state中的值都用Upper(NEW.vend_state)替换。
+
+#### 关于触发器
+
+- 创建触发器可能需要特殊的安全访问权限，但是触发器的执行是自动的。如果INSERT、UPDATE和DELETE语句能够执行，则相关的触发器也能执行。
+- 应该用触发器来保证数据的一致性（大小写、格式等）。在触发器中执行这种类型的处理的优点是它总是进行这种处理，而且是透明地进行，与客户无关。
+- 触发器的一种非常有意义的使用时创建审计跟踪。使用触发器把更改记录到另一表中非常容易。
+- MySQL触发器不支持CALL语句。这表示不能从触发器内调用存储过程。所需的存储过程需要复制到触发器内。
+
+---
+
+## 管理事务处理
+
+### 事务处理
+
+用来维护数据库的完整性，它保证成批的MySQL操作要么完全执行，要么完全不执行。
+
+利用事务处理，可以保证一组操作不会中途停止，它们或者作为整体执行，或者完全不执行。如果没有错误发生，整组语句提交到（写到）数据库表。如果发生错误，则进行回退（撤销）以恢复数据库到某个已知且安全的状态。
+
+**事务（transaction）**：指一组SQL语句
+
+**回退（rollback）**：指撤销指定的SQL语句的过程
+
+**提交（commit）**：指将未存储的SQL语句结果写入数据库表
+
+**保留点（savepoint）**：指事务处理中设置的临时占位符，可以对它发布回退（与回退整个事务处理不同）。
+
+### 控制事务处理
+
+MySQL使用下面的语句来标识事务的开始：
+
+~~~mysql
+START TRANSACTION
+~~~
+
+使用ROLLBACK：MySQL的ROLLBACK命令用来回退（撤销）MySQL语句，如下;
+
+~~~mysql
+SELECT * FROM ordertotals;
+START TRANSACTION;
+DELETE FROM ordertotals;
+SELECT * FROM ordertotals;
+ROLLBACK;
+SELECT * FROM ordertotals;
+~~~
+
+首先执行一条SELECT语句显示该表不为空。然后开始一个事务处理，用一条DELETE语句删除ordertotals中的所有行。另一条SELECT语句验证ordertotals确实为空。这是用一条ROLLBACK语句回退START TRANSACTION之后的所有语句，最后一条SELECT用户显示该表不为空。
+
+显然，ROLLBACK只能在一个事务处理内使用（在执行START TRANSACTION命令之后）。
+
+**哪些语句可以回退**：事务处理用来管理INSERT、UPDATE和DELETE语句。不能回退SELECT、CREATE或DROP语句。事务处理块中可以使用这两条语句，但如果执行回退，不会被撤销。
+
+#### 使用COMMIT
+
+一般的MySQL语句都是直接针对数据库表执行和编写的，这就是所谓的隐含提交（implicit commit)，即提交（写或保存）操作是自动进行的。
+
+但是，在事务处理块中，提交不会隐含地进行。为进行明确的提交，使用COMMIT语句：
+
+~~~mysql
+START TRANSACTION;
+DELETE FROM orderitems WHERE order_num = 20010;
+DELETE FROM orders WHERE order_num = 20010;
+COMMIT;
+~~~
+
+最后的COMMIT语句仅在不出错时写出更改。如果第一条DELETE起作用，但第二条失败，则DELETE不会提交（实际上，会自动撤销）。
+
+**隐含事务关闭**：当COMMIT或ROLLBACK语句执行后，事务会自动关闭（将来的更改会隐含提交）。
+
+#### 使用保留点
+
+为了支持回退部分事务处理，必须能在事务处理块中合适的位置放置占位符。这样，如果需要回退，可以回退到某个占位符。这些占位符称为保留点。可以使用SAVEPOINT语句创建;
+
+~~~mysql
+SAVEPOINT delete1;
+~~~
+
+每个保留点都取标识它的唯一名字，以便在回退时，MySQL知道要回退到何处。为了回退到本例给出的保留点，可如下进行：
+
+~~~mysql
+ROLLBACK TO delete1;
+~~~
+
+**释放保留点**：保留点在事务处理完成（执行一条ROLLBACK或COMMIT）后自动释放。也可以用RELEASE SAVEPOINT明确地释放保留点。
+
+#### 更改默认的提交行为
+
+默认的MySQL行为是自动提交所有更改。为指示MySQL不自动提交更改，需要使用以下语句;l
+
+~~~mysql
+SET autocommit=0;
+~~~
+
+autocommit标志决定是否自动提交更改，不管有没有COMMIT语句。设置autocommit=0指示MySQL不自动提交更改（直到autocommit被设置为真位置）。
+
+autocommit标志是针对每个联结而不是服务器。
 
