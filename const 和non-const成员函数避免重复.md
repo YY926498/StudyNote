@@ -32,3 +32,4 @@ private:
 为什么不先定义`non-const`函数，再用`const`函数调用`non-const`函数?
 
 **这是因为`const`成员函数承诺绝不改变其对象的逻辑状态，如果在`const`成员函数内调用`non-const`成员函数，就会冒这种风险。**
+
