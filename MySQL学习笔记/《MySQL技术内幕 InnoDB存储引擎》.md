@@ -88,3 +88,78 @@ InnoDB存储引擎是基于磁盘存储的，并将其中的记录按照页的�
 对于数据库中页的修改操作，则首先修改在缓冲池中的页，然后再以一定的频率刷新到磁盘中。通过Checkpoint的机制刷新回磁盘。
 
 综上，缓冲池的大小直接影响数据库的整体性能。由于32位的操作系统的限制，在该系统下最多将该值设置为3G。也可以打开PAE选项来获得最大64G内存的支持。
+
+对于InnoDB存储引擎，缓冲池的配置可以通过参数innodb_buffer_pool_size来设置。
+
+~~~mysql
+SHOW VARIABLES LIKE 'innodb_buffer_pool_size';
+~~~
+
+结果：
+
+~~~mysql
++-------------------------+---------+
+| Variable_name           | Value   |
++-------------------------+---------+
+| innodb_buffer_pool_size | 8388608 |
++-------------------------+---------+
+~~~
+
+缓冲池中缓存的数据页类型有：索引页、数据页、undo页、插入缓冲(insert buffer)、自适应哈希索引、InnoDB存储的锁信息、数据字典信息等。
+
+每个页根据哈希值平均分配到不同的缓冲区实例中。这样做的好处是减少数据库内部的资源竞争，增加数据库的并发处理能力。可以通过innodb_buffer_pool_instances来进行设置，该值默认为1.
+
+~~~mysql
+SHOW VARIABLES LIKE 'innodb_buffer_pool_instances';
+~~~
+
+~~~mysql
++------------------------------+-------+
+| Variable_name                | Value |
++------------------------------+-------+
+| innodb_buffer_pool_instances | 1     |
++------------------------------+-------+
+~~~
+
+### LRU List、Free List和Flush List
+
+通常来说，数据库中的缓冲池是通过LRU算法来进行管理的。当缓冲池不能存放新读取到的页时，将首先释放LRU列表中的尾端的页。
+
+InnoDB存储引擎中，缓冲池中的页大小默认为16K，同样适用LRU算法对缓冲池进行管理。但是在InnoDB的存储引擎中，LRU列表中还加入了midpoint位置。即新访问的页，不是直接放入到LRU列表的首部，而是放入到LRU列表的midpoint位置。这个算法在InnoDB存储引擎下称为midpoint insertion strategy。默认配置下，该点位置在LRU列表长度的5/8处。midpoint位置可由参数innodb_old_blocks_pct控制。
+
+~~~mysql
+SHOW VARIABLES LIKE 'innodb_old_blocks_pct';
++-----------------------+-------+
+| Variable_name         | Value |
++-----------------------+-------+
+| innodb_old_blocks_pct | 37    |
++-----------------------+-------+
+~~~
+
+从上面的例子可以看出，参数innoDB_old_blocks_pct的默认值是37，表示新读取的页插入到LRU列表尾端的37%的位置（差不多3/8的位置）。在InnoDB存储引擎中，把midpoint之后的列表称为old列表，之前的称为new列表。可以简单的理解为new列表中的页都是最活跃的热点数据。
+
+不采用朴素的LRU算法的理由：直接将读取的页放入到LRU列表的首部，某些SQL操作可能会使缓冲池中的页被刷新出，从而影响缓冲池的效率。常见的这类操作作为索引或数据的扫描操作。这类操作需要访问表中的许多页，甚至是全部的页，而这些页通常来说仅在这次查询操作中需要，并不是活跃的热点数据。如果页被放入LRU列表的首部，那么非常可能将所需要的热点数据页从LRU列表中移除，而在下一次需要读取该页时，InnoDB存储引擎需要再次访问磁盘。
+
+另外，InnoDB存储引擎引入了另一个参数来进一步管理LRU列表，这个参数是innodb_old_blocks_time，用于表示页读取到的mid位置后需要等待多久才会被加入到LRU列表的热端。因此当需要执行上述所说的SQL操作时，可以通过下面的方法尽可能使LRU列表中的热点数据不被刷出。
+
+~~~mysql
+SET GLOBAL innodb_old_blocks_time = 1000;
+~~~
+
+如果预估自己的活跃热点数据不止63%，那么在执行SQL语句前，还可以通过下面的语句来减少热点页被刷出的概率：
+
+~~~mysql
+SET GLOBAL innodb_old_blocks_pct=20;
+~~~
+
+当数据库刚启动时，LRU列表是空的，即没有任何的页，都存放在FREE列表中。当需要从缓冲池中分页时，首先从FREE列表中查找是否有可用的空闲页，若有则将该页从FREE移到LRU列表中。当页从LRU的old部分加入到new部分时，称此时的操作为page made young，因为innodb_old_blocks_time的设置导致页没有从old部分移动到new部分的操作称为page not made young。可以通过SHOW ENGINE INNODB STATUS来观察LRU列表即Free列表的使用情况。
+
+使用命令SHOW ENGINE INNODB STATUS;显示的不是当前的状态，而是过去某个时间范围内InnoDB存储引擎的状态。
+
+InnoDB支持压缩页的功能，即将原本的16KB的页压缩为1KB、2KB、4KB和8KB。这些压缩页通过unzip_LRU列表进行管理。
+
+unzip_LRU分配内存的步骤：
+
+首先，在unzip_LRU列表中对 不同压缩页大小进行分别管理。其次，通过伙伴算法进行内存的分配。例如需要从缓冲池中申请页4KB的大小：
+
+- 
