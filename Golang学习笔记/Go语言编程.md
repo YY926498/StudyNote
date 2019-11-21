@@ -157,3 +157,29 @@ input := bufio.NewScanner(os.Stdin)
 
 ### GIF动画
 
+常量是指在程序编译后始终都不会变化的值，一般出现在包级别的。但也可以声明定义在函数体内部，那么这种常量就只能在函数体内用。目前常量声明的值必须是一个数字值/字符串或者一个固定的boolean值。
+
+`[]color.Color{...}`和`gif.GIF{...}`这两个表达式是复合声明。这是实例化Go语言里的符合类型的一种写法。前者生成的是一个`slice`切片，后者生成的是一个`struct`结构体。如下：
+
+~~~go
+//gif
+type GIF struct {
+	Image []*image.Paletted 
+	Delay []int         
+	LoopCount int
+	Disposal []byte
+	Config image.Config
+	BackgroundIndex byte
+}
+
+anim := gif.GIF{LoopCount : 1}
+~~~
+
+上述是实例化一个GIF结构体，并且将其中的`LoopCount`成员初始化为1，其他成员会被设置各自类型默认的零值。
+
+### 获取URL
+
+主要使用`net/http`和`io/ioutil`包。其中`http.Get`函数是创建`HTTP`请求的函数，如果获取过程没有出错，那么就会在返回的结果中得到访问的请求结果。返回的Response指针的`Body`字段包括一个可读的服务器响应流。`ioutil.ReadAll`函数从`response`中读取到全部内容，将其结果保存到一个变量中。`response.Body.Close`函数关闭`response`的`Body`流，防止资源泄露。
+
+### 并发获取多个URL
+
