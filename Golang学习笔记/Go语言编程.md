@@ -183,3 +183,69 @@ anim := gif.GIF{LoopCount : 1}
 
 ### 并发获取多个URL
 
+`goroutine`是一种函数的并发执行方式，而`channel`是用来在`goroutine`之间进行参数传递。`main`函数本身也运行在一个`goroutine`中，而`go function`则表示创建一个新的`goroutine`，并在这个新的`goroutine`中执行这个函数。
+
+使用`make`函数创建一个传递`string`类型参数的`channel`：
+
+~~~go
+ch := make(chan string)
+~~~
+
+`ioutil.Discard`输出流相当于一个垃圾桶。使用`io.Copy`可将一个字节数组拷贝到一个输出流，并返回长度。
+
+当一个`goroutine`尝试在一个`channel`上做`send`或者`receive`操作时，这个`goroutine`会阻塞在调用处，直到另一个`goroutine`从这个`channel`里接收或者写入值，这样两个`goroutine`才会继续执行`channel`操作之后的逻辑。
+
+~~~go
+ch := make(chan string)
+ch <- string("nihao")//将数据写到channel
+fmt.Println(<-ch)//从channel中读取数据
+~~~
+
+### Web服务
+
+主要使用
+
+~~~go
+http.HandleFunc("/",func(w http.ResponseWriter, r *http.Request){
+	//...
+})
+~~~
+
+### 本章总结
+
+`switch`：
+
+~~~go
+switch coinflip () {
+    case "heads":
+    	heads++
+    case "tails":
+    	tails++
+    default:
+    fmt.Println("landed on edge!")
+}
+~~~
+
+Go语言不需要显式地在每一个`case`后写`break`，语言默认执行完`case`后的逻辑语句会自动退出。如果想相邻的几个`case`都执行同一逻辑，需要显式地写上一个`fallthrough`语句来覆盖这种默认行为。
+
+另外Go语言的`switch`可以不带对象（`switch`不带操作对象时，默认用`true`值代替，然后将每个`case`的表达式和true值进行比较；可以直接罗列多种条件，像其他语言的`if else`一样，如下：
+
+~~~go
+func Signum(x int)int {
+    switch {
+        case x>0:
+        	return +1
+        default:
+        	return 0
+        case x<0:
+        	return -1
+    }
+}
+~~~
+
+这种叫`无tag switch`；这和`switch true`等价。
+
+类似于`for`和`if`控制语句一样，`switch`也可以紧跟一个简短的变量声明，一个自增表达式/赋值语句，或者一个函数调用。
+
+
+
