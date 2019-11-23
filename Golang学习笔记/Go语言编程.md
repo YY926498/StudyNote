@@ -247,5 +247,96 @@ func Signum(x int)int {
 
 类似于`for`和`if`控制语句一样，`switch`也可以紧跟一个简短的变量声明，一个自增表达式/赋值语句，或者一个函数调用。
 
+**命名类型**：类型声明可以很方便地给一个特殊类型一个名字。因为`struct`类型声明非常长，可以给`struct`取一个名字。例如：
 
+~~~go
+type Point struct {
+    X, Y int
+}
 
+var p Point
+~~~
+
+**指针**：Go语言提供了指针。指针时一种直接存储了变量的内存地址的数据类型。Go语言的指针没有C语言这么强。指针是可见的内存地址，`&`操作符可以返回一个变量的内存地址，并且`*`操作符可以获取指针指向的变量内容，但是在Go语言里没有指针运算，也就是不能像C语言里可以对指针进行加或减操作。
+
+**方法和接口**：方法是和命名类型关联的一类函数。Go语言里比较特殊的是方法可以被关联到任意一种命名类型。接口是一种抽象类型，这种类型可以让我们以同样的方式来处理不同的固有类型，不用关心它们的具体实现，而只需要关注它们提供的方法。
+
+**包(package)**：Go语言提供了很多包，并且这些包是可以扩展的。借助`godoc`工具可以直接在本地命令行阅读标准库的文档：
+
+~~~go
+go doc http.ListenAndServe
+---------------------------------------------------------------------
+package http // import "net/http"
+
+func ListenAndServe(addr string, handler Handler) error
+    ListenAndServe listens on the TCP network address addr and then calls Serve
+    with handler to handle requests on incoming connections. Accepted
+    connections are configured to enable TCP keep-alives.
+
+    The handler is typically nil, in which case the DefaultServeMux is used.
+
+    ListenAndServe always returns a non-nil error.
+~~~
+
+**注释**：在源文件开头写注释和在每个函数前写一个说明函数行为的注释是一个好习惯，可以被`godoc`这样的工具检测到。并且在执行命令时显示这些注释。
+
+多行注释可以用`/*...*/`来包裹。
+
+## 程序结构
+
+### 命名
+
+Go语言中的函数名，变量名，常量名，类型名，语句标号和包名等所有的命名，都遵循一个简单的命名规则：一个名字必须以一个字母（Unicode字母）或下划线开头，后面可以跟任意数量的字母，数字或下划线。大写字母和小写字母是不同的。
+
+**关键字**：
+
+~~~go
+break		default			func	interface	select
+case		defer			go		map			struct
+chan		else			goto	package		switch
+const		fallthrough		if		range		type
+continue	for				import	return		var
+~~~
+
+预定义名字：
+
+~~~go
+内建常量：true	false	iota	nil
+
+内建类型：int	int8	int16	int32	int64
+		uint	uint8	uint16	uint32	uint64	uintptr
+		float32	float64	complex128	complex64
+		bool	byte	string	error
+
+内建函数：make	len	cap	new	append	copy	close	delete
+		complex	real	imag
+		panic	recover
+~~~
+
+这些内部预定义的名字不是关键字，可以重新定义，但是要避免过度定义引起混乱。
+
+如果一个名字是在函数内部定义，那么它就在函数内部有效。如果是在函数外部定义，那么将在当前包的所有文件中都可以访问。名字的开头字母的大小写决定了名字在包外的可见性。如果一个名字是大写字母开头的（必须是在函数外部定义的包级别的名字，包级函数名本身也是包级名字），那么它将是导出的，也就是说可以被外部的包访问，例如`fmt`包的`Printf`函数就是导出的，可以在`fmt`包外部访问。包本身的名字一般是用小写字母。
+
+名字的长度没有逻辑限制，但是Go语言的风格是尽量使用短小的名字，对于局部变量尤其是这样。通常来说，如果一个名字的作用域比较大，声明周期比较长，那么用长的名字就会更有意义。
+
+Go语言推荐使用驼峰式命名，当名字由几个单词组成，优先使用大小写分割，而不是优先使用下划线分割。但是对于缩略词，采用全部大写的形式，例如：`ASCII`或者`HTML`。
+
+### 声明
+
+声明语句定义了程序的各种实体对象以及部分或全部的属性。Go语言主要有四种类型的声明语句：`var`，`const`，`type`和`func`。分别对应变量，常量，类型和函数实体对象的声明。
+
+在包一级声明语句声明的名字可在整个包对应的每个源文件中访问，而不是仅仅在其声明语句所在的源文件中访问。相比之下，局部声明的名字就只能在函数内部很小的范围被访问。
+
+一个函数的声明由一个函数名字，参数列表（由函数的调用者提供参数变量的具体值），一个可选的返回值列表和包含函数体定义的函数体组成。如果函数没有返回值，那么返回值列表是省略的。执行函数从函数的第一个语句开始，一次顺序执行直到遇到return返回语句，如果没有返回语句则是执行到函数末尾，然后返回到函数调用者。
+
+### 变量
+
+`var`声明语句可以创建一个特定类型的变量，然后给变量附加一个名字，并且设置变量的初始值。变量声明的一般语法如下：
+
+~~~go
+var 变量名字  类型 = 表达式
+~~~
+
+其中`类型`或`= 表达式`两个部分可以省略其中的一个。如果省略的是类型信息，那么将根据初始化表达式来推导变量的类型信息。如果初始化表达式被省略，那么将用零值初始化该变量。数值类型变量对应的零值是0，布尔类型的变量对应的零值是false，字符串类型对应的零值是空字符串，接口或引用类型（包括`slice`，指针，`map`，`chan`和函数）变量对应的零值是`nil`。数组或结构体等聚合类型对应的零值是每个元素或字段都是对应该类型的零值。
+
+ 零值初始化机制可以确保每个声明的变量总是有一个良好定义的值，因此在Go语言中不存在未初始化的变量。这个特性可以简化很多代码，而且可以在没有增加额外工作的前提下确保边界条件下的合理行为。 
