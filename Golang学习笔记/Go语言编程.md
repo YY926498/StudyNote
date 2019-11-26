@@ -1063,3 +1063,143 @@ fmt.Println(x)      // "[1 2 3 4 5 6 1 2 3 4 5 6]"
 ```
 
 函数参数中的最后的“...”省略号表示接收变长的参数为slice。
+
+### Map
+
+ 哈希表是一种巧妙并且实用的数据结构。它是一个无序的key/value对的集合，其中所有的key都是不同的，然后通过给定的key可以在常数时间复杂度内检索、更新或删除对应的value。 
+
+ 在Go语言中，一个map就是一个哈希表的引用，map类型可以写为map[K]V，其中K和V分别对应key和value。map中所有的key都有相同的类型，所有的value也有着相同的类型，但是key和value之间可以是不同的数据类型。其中K对应的key必须是支持==比较运算符的数据类型，所以map可以通过测试key是否相等来判断是否已经存在。 
+
+内置的make函数可以创建一个map：
+
+```Go
+ages := make(map[string]int) // mapping from strings to ints
+```
+
+可以用map字面值的语法创建map，同时还可以指定一些最初的key/value：
+
+```Go
+ages := map[string]int{
+    "alice":   31,
+    "charlie": 34,
+}
+```
+
+这相当于
+
+```Go
+ages := make(map[string]int)
+ages["alice"] = 31
+ages["charlie"] = 34
+```
+
+因此，另一种创建空的map的表达式是`map[string]int{}`。
+
+使用内置的delete函数可以删除元素：
+
+```Go
+delete(ages, "alice") // remove element ages["alice"]
+```
+
+所有这些操作是安全的，即使这些元素不在map中也没有关系；如果一个查找失败将返回value类型对应的零值。
+
+即使map中不存在“bob”下面的代码也可以正常工作，因为ages["bob"]失败时将返回0。
+
+```Go
+ages["bob"] = ages["bob"] + 1 
+```
+
+ 而且`x += y`和`x++`等简短赋值语法也可以用在map上 。
+
+ 但是map中的元素并不是一个变量，因此我们不能对map的元素进行取址操作 。 禁止对map元素取址的原因是map可能随着元素数量的增长而重新分配更大的内存空间，从而可能导致之前的地址无效。 
+
+ Map的迭代顺序是不确定的，并且不同的哈希函数实现可能导致不同的遍历顺序。在实践中，遍历的顺序是随机的，每一次遍历的顺序都不相同。这是故意的，每次都使用随机的遍历顺序可以强制要求程序不会依赖具体的哈希函数实现。如果要按顺序遍历key/value对，我们必须显式地对key进行排序 。
+
+map类型的零值是nil，也就是没有引用任何哈希表。
+
+```Go
+var ages map[string]int
+fmt.Println(ages == nil)    // "true"
+fmt.Println(len(ages) == 0) // "true"
+```
+
+map上的大部分操作，包括查找、删除、`len`和`range`循环都可以安全工作在nil值的map上，它们的行为和一个空的map类似。但是向一个nil值的map存入元素将导致一个panic异常：
+
+```Go
+ages["carol"] = 21 // panic: assignment to entry in nil map
+```
+
+在向map存数据前必须先创建map。
+
+ 通过key作为索引下标来访问map将产生一个value。如果key在map中是存在的，那么将得到与key对应的value；如果key不存在，那么将得到value对应类型的零值 。 有时候可能需要知道对应的元素是否真的是在map之中。例如，如果元素类型是一个数字，你可能需要区分一个已经存在的0，和不存在而返回零值的0 。
+
+~~~go
+var maptest map[string]int
+fmt.Println(maptest == nil)//"true"
+fmt.Println(len(maptest)==0)//"true"
+
+test,ok := maptest["yang"]
+if !ok{
+    //"yang" is not a key in this map
+}
+~~~
+
+或者这样：
+
+~~~GO
+if age, ok := ages["bob"]; !ok { /* ... */ }
+~~~
+
+ 在这种场景下，map的下标语法将产生两个值；第二个是一个布尔值，用于报告元素是否真的存在。布尔变量一般命名为`ok`，特别适合马上用于if条件判断部分。 
+
+ 和slice一样，map之间也不能进行相等比较；唯一的例外是和nil进行比较。要判断两个map是否包含相同的key和value，我们必须通过一个循环实现 。
+
+ 有时候我们需要一个map或set的key是slice类型，但是map的key必须是可比较的类型，但是slice并不满足这个条件。不过，我们可以通过两个步骤绕过这个限制。第一步，定义一个辅助函数k，将slice转为map对应的string类型的key，确保只有x和y相等时k(x) == k(y)才成立。然后创建一个key为string类型的map，在每次对map操作时先用k辅助函数将slice转化为string类型。 
+
+ Map的value类型也可以是一个聚合类型，比如是一个map或slice。 比如：
+
+~~~go
+var graph = make(map[string]map[string]bool)
+//此时value为map[string]bool类型
+~~~
+
+### 结构体
+
+ `JSON`是一种用于发送和接收结构化信息的标准协议 。 Go语言对于这些标准格式的编码和解码都有良好的支持，由标准库中的`encoding/json`、`encoding/xml`、`encoding/asn1`等包提供支持 
+
+ 基本的`JSON`类型有数字（十进制或科学记数法）、布尔值（true或false）、字符串，其中字符串是以双引号包含的Unicode字符序列，支持和Go语言类似的反斜杠转义特性，不过`JSON`使用的是`\Uhhhh`转义数字来表示一个`UTF-16`编码（译注：`UTF-16`和`UTF-8`一样是一种变长的编码，有些Unicode码点较大的字符需要用4个字节表示；而且`UTF-16`还有大端和小端的问题），而不是Go语言的rune类型。 
+
+ 基础类型可以通过`JSON`的数组和对象类型进行递归组合。一个`JSON`数组是一个有序的值序列，写在一个方括号中并以逗号分隔；一个`JSON`数组可以用于编码Go语言的数组和slice。一个`JSON`对象是一个字符串到值的映射，写成一系列的`name:value`对形式，用花括号包含并以逗号分隔；`JSON`的对象类型可以用于编码Go语言的map类型（key类型是字符串）和结构体。
+
+~~~go
+boolean         true
+number          -273.15
+string          "She said \"Hello, BF\""
+array           ["gold", "silver", "bronze"]
+object          {"year": 1980,
+                 "event": "archery",
+                 "medals": ["gold", "silver", "bronze"]}
+~~~
+
+ 将一个Go语言中类似movies的结构体slice转为`JSON`的过程叫编组（marshaling）。编组通过调用`json.Marshal`函数完成。 Marshal函数返还一个编码后的字节slice，包含很长的字符串，并且没有空白缩进 。
+
+ 在编码时，默认使用Go语言结构体的成员名字作为`JSON`的对象（通过reflect反射技术）。只有导出的结构体成员才会被编码 ，因此需要首字母大写。
+
+ 结构体的成员Tag可以是任意的字符串面值，但是通常是一系列用空格分隔的key:"value"键值对序列；因为值中含有双引号字符，因此成员Tag一般用原生字符串面值的形式书写。 
+
+~~~GO
+type Movie struct {
+    Title  string
+    Year   int  `json:"released"`
+    Color  bool `json:"color,omitempty"`
+    Actors []string
+}
+~~~
+
+ `json`开头键名对应的值用于控制`encoding/json`包的编码和解码的行为，并且`encoding/...`下面其它的包也遵循这个约定。成员`Tag`中`json`对应值的第一部分用于指定`JSON`对象的名字，比如将Go语言中的`TotalCount`成员对应到`JSON`中的`total_count`对象。`Color`成员的`Tag`还带了一个额外的`omitempty`选项，表示当Go语言结构体成员为空或零值时不生成该`JSON`对象（这里false为零值）。 
+
+ 编码的逆操作是解码，对应将`JSON`数据解码为Go语言的数据结构，Go语言中一般叫`unmarshaling`，通过`json.Unmarshal`函数完成。将`JSON`编码解码为一个结构体`slice`，结构体中可以定义感兴趣的成员。通过定义合适的Go语言数据结构，我们可以选择性地解码`JSON`中感兴趣的成员。当`Unmarshal`函数调用返回，`slice`将被只含有同名的成员返回，其它`JSON`成员将被忽略。
+
+ 即使对应的`JSON`对象名是小写字母，每个结构体的成员名也是声明为大写字母开头的。因为有些`JSON`成员名字和Go结构体成员名字并不相同，因此需要Go语言结构体成员`Tag`来指定对应的`JSON`名字。同样，在解码的时候也需要做同样的处理 。
+
+ 使用了`json.Unmarshal`函数来将`JSON`格式的字符串解码为字节`slice`。也可以使用了基于流式的解码器`json.Decoder`，它可以从一个输入流解码`JSON`数据，尽管这不是必须的。同样还有一个针对输出流的`json.Encoder`编码对象。 
