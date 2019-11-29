@@ -1873,3 +1873,83 @@ scale(&p,2)
 
  Go的编码风格不禁止直接导出字段。当然，一旦进行了导出，就没有办法在保证`API`兼容的情况下去除对其的导出，所以在一开始的选择一定要经过深思熟虑并且要考虑到包内部的一些不变量的保证，未来可能的变化，以及调用方的代码质量是否会因为包的一点修改而变差。 
 
+## 接口
+
+ 接口类型是一种抽象的类型。它不会暴露出它所代表的对象的内部值的结构和这个对象支持的基础操作的集合；它们只会表现出它们自己的方法。 
+
+ 一方面这个约定需要调用者提供具体类型的值 。 这些类型都有一个特定签名和行为函数。 另一方面这个约定保证了`Fprintf`接受任何满足`io.Writer`接口的值都可以工作。`Fprintf`函数可能没有假定写入的是一个文件或是一段内存，而是写入一个可以调用Write函数的值。 
+
+ 一个类型可以自由地被另一个满足相同接口的类型替换，被称作可替换性(LSP里氏替换)。这是一个面向对象的特征。 
+
+### 接口类型
+
+ 接口类型具体描述了一系列方法的集合，一个实现了这些方法的具体类型是这个接口类型的实例。 
+
+ 与结构体内嵌一个，可以用一个简写命名一个接口，而不用声明它所有的方法。这种方式称为接口内嵌 。也可以混用两种形式。
+
+### 实现接口的条件
+
+ 接口指定的规则非常简单：表达一个类型属于某个接口只要这个类型实现这个接口。 
+
+```go
+var w io.Writer
+w = os.Stdout           // OK: *os.File has Write method
+w = new(bytes.Buffer)   // OK: *bytes.Buffer has Write method
+w = time.Second         // compile error: time.Duration lacks Write method
+
+var rwc io.ReadWriteCloser
+rwc = os.Stdout         // OK: *os.File has Read, Write, Close methods
+rwc = new(bytes.Buffer) // compile error: *bytes.Buffer lacks Close method
+```
+
+这个规则甚至适用于等式右边本身也是一个接口类型
+
+```go
+w = rwc                 // OK: io.ReadWriteCloser has Write method
+rwc = w                 // compile error: io.Writer lacks Close method
+```
+
+因为`ReadWriter`和`ReadWriteCloser`包含所有Writer的方法，所以任何实现了`ReadWriter`和`ReadWriteCloser`的类型必定也实现了Writer接口
+
+ 一个类型持有一个方法的表示当中的细节。  对于每一个命名过的具体类型T；它的一些方法的接收者是类型T本身然而另一些则是一个`*T`的指针。还记得在T类型的参数上调用一个`*T`的方法是合法的，只要这个参数是一个变量；编译器隐式的获取了它的地址。但这仅仅是一个语法糖：T类型的值不拥有所有`*T`指针的方法，这样它就可能只实现了更少的接口。 
+
+```go
+type IntSet struct { /* ... */ }
+func (*IntSet) String() string
+var _ = IntSet{}.String() // compile error: String requires *IntSet receiver
+```
+
+但是我们可以在一个IntSet值上调用这个方法：
+
+```go
+var s IntSet
+var _ = s.String() // OK: s is a variable and &s has a String method
+```
+
+然而，由于只有`*IntSet`类型有String方法，所以也只有`*IntSet`类型实现了fmt.Stringer接口：
+
+```go
+var _ fmt.Stringer = &s // OK
+var _ fmt.Stringer = s  // compile error: IntSet lacks String method
+```
+
+ 接口类型封装和隐藏具体类型和它的值。即使具体类型有其它的方法，也只有接口类型暴露出来的方法会被调用到。
+
+ interface{}被称为空接口类型 。 空接口类型对实现它的类型没有要求，所以我们可以将任意一个值赋给空接口类型。 
+
+```go
+var any interface{}
+any = true
+any = 12.34
+any = "hello"
+any = map[string]int{"one": 1}
+any = new(bytes.Buffer)
+```
+
+ 因为接口与实现只依赖于判断两个类型的方法，所以没有必要定义一个具体类型和它实现的接口之间的关系。也就是说，尝试文档化和断言这种关系几乎没有用，所以并没有通过程序强制定义。 
+
+ 非空的接口类型比如`io.Writer`经常被指针类型实现，尤其当一个或多个接口方法像Write方法那样隐式的给接收者带来变化的时候。一个结构体的指针是非常常见的承载方法的类型。 
+
+ 但是并不意味着只有指针类型满足接口类型，甚至连一些有设置方法的接口类型也可能会被Go语言中其它的引用类型实现。  甚至基本的类型也可能会实现一些接口 。
+
+ 一个具体的类型可能实现了很多不相关的接口 。 每一个具体类型的组基于它们相同的行为可以表示成一个接口类型。不像基于类的语言，他们一个类实现的接口集合需要进行显式的定义，在Go语言中我们可以在需要的时候定义一个新的抽象或者特定特点的组，而不需要修改具体类型的定义。当具体的类型来自不同的作者时这种方式会特别有用。当然也确实没有必要在具体的类型中指出这些共性。 
