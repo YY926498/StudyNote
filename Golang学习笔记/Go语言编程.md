@@ -2009,6 +2009,52 @@ f(buf) // OK
 
  web服务器在一个新的协程中调用每一个handler，所以当handler获取其它协程或者这个handler本身的其它请求也可以访问到变量时，一定要使用预防措施，比如锁机制。 
 
+### `sort.Interface`接口
+
+一个内置的排序算法需要知道三个东西：序列的长度，表示两个元素比较的结果，一种交换两个元素的方式；这就是`sort.Interface`的三个方法：
+
+```go
+package sort
+
+type Interface interface {
+    Len() int
+    Less(i, j int) bool // i, j are indices of sequence elements
+    Swap(i, j int)
+}
+```
+
+为了对序列进行排序，我们需要定义一个实现了这三个方法的类型，然后对这个类型的一个实例应用`sort.Sort`函数。思考对一个字符串切片进行排序，这可能是最简单的例子了。下面是这个新的类型`StringSlice`和它的`Len`，`Less`和`Swap`方法
+
+```go
+type StringSlice []string
+func (p StringSlice) Len() int           { return len(p) }
+func (p StringSlice) Less(i, j int) bool { return p[i] < p[j] }
+func (p StringSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+```
+
+` sort.Reverse`函数值得进行更近一步的学习，因为它使用了一个匿名类，这是一个重要的思路。`sort`包定义了一个不公开的`struct`类型`reverse`，它嵌入了一个`sort.Interface`。`reverse`的`Less`方法调用了内嵌的`sort.Interface`值的`Less`方法，但是通过交换索引的方式使排序结果变成逆序。 
+
+```go
+package sort
+
+type reverse struct{ Interface } 
+// that is, sort.Interface
+
+func (r reverse) Less(i, j int) bool { 
+    return r.Interface.Less(j, i) 
+}
+
+func Reverse(data Interface) Interface { 
+    return &reverse{data} 
+}
+```
+
+`reverse`的另外两个方法`Len`和`Swap`隐式地由原有内嵌的`sort.Interface`提供。
+
+ 对于我们需要的每个切片元素类型和每个排序函数，我们需要定义一个新的`sort.Interface`实现。 
+
+ 为了使用方便，`sort`包为`[]int`,`[]string`和`[]float64`的正常排序提供了特定版本的函数和类型。 
+
 ### error接口
 
 error接口实际上是interface接口。
@@ -2345,4 +2391,4 @@ fmt.Println(len(ch)) // "2"
 
 ### 并发的循环
 
- 匿名函数中的循环变量快照问题。range循环中，单独的循环变量f是被所有的匿名函数值所共享，且会被连续的循环迭代所更新的。当新的goroutine开始执行字面函数时，for循环可能已经更新了f并且开始了另一轮的迭代或者(更有可能的)已经结束了整个循环，所以当这些goroutine开始读取f的值时，它们所看到的值已经是slice的最后一个元素了。显式地添加这个参数，我们能够确保使用的f是当go语句执行时的“当前”那个f。 
+ 匿名函数中的循环变量快照问题。range循环中，单独的循环变量f是被所有的匿名函数值所共享，且会被连续的循环迭代所更新的。当新的`goroutine`开始执行字面函数时，for循环可能已经更新了f并且开始了另一轮的迭代或者(更有可能的)已经结束了整个循环，所以当这些`goroutine`开始读取f的值时，它们所看到的值已经是slice的最后一个元素了。显式地添加这个参数，我们能够确保使用的f是当go语句执行时的“当前”那个f。 
