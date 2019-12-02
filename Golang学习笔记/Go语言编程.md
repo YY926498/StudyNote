@@ -2602,3 +2602,114 @@ func New(source Source) *Rand
 这可能导致一些名字重复，例如template.Template或rand.Rand，这就是为什么这些种类的包名往往特别短的原因之一。
 
 在另一个极端，还有像`net/http`包那样含有非常多的名字和种类不多的数据类型，因为它们都是要执行一个复杂的复合任务。尽管有将近二十种类型和更多的函数，但是包中最重要的成员名字却是简单明了的：Get、Post、Handle、Error、Client、Server等。
+
+## 反射
+
+ Go语言提供了一种机制，能够在运行时更新变量和检查它们的值、调用它们的方法和它们支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。 
+
+### `reflect.Type`和`reflect.Value`
+
+ 反射是由 reflect 包提供的。 它定义了两个重要的类型, Type 和 Value. 一个 Type 表示一个Go类型. 它是一个接口 。 唯一能反映` reflect.Type` 实现的是接口的类型描述信息, 也正是这个实体标识了接口值的动态类型。
+
+函数 reflect.TypeOf 接受任意的 interface{} 类型, 并以reflect.Type形式返回其动态类型:
+
+```Go
+t := reflect.TypeOf(3)  // a reflect.Type
+fmt.Println(t.String()) // "int"
+fmt.Println(t)          // "int"
+```
+
+其中` TypeOf(3) `调用将值 3 传给 interface{} 参数。 将一个具体的值转为接口类型会有一个隐式的接口转换操作, 它会创建一个包含两个信息的接口值: 操作数的动态类型(这里是int)和它的动态的值(这里是3)。
+
+因为 `reflect.TypeOf` 返回的是一个动态类型的接口值, 它总是返回具体的类型. 因此, 下面的代码将打印 `*os.File`而不是 `io.Writer`. 稍后, 我们将看到能够表达接口类型的 `reflect.Type`.
+
+```Go
+var w io.Writer = os.Stdout
+fmt.Println(reflect.TypeOf(w)) // "*os.File"
+```
+
+ `reflect `包中另一个重要的类型是 `Value`. 一个` reflect.Value` 可以装载任意类型的值. 函数 `reflect.ValueOf `接受任意的` interface{} `类型, 并返回一个装载着其动态值的` reflect.Value`. 和 `reflect.TypeOf `类似, `reflect.ValueOf `返回的结果也是具体的类型, 但是 `reflect.Value` 也可以持有一个接口值。
+
+```Go
+v := reflect.ValueOf(3) // a reflect.Value
+fmt.Println(v)          // "3"
+fmt.Printf("%v\n", v)   // "3"
+fmt.Println(v.String()) // NOTE: "<int Value>"
+```
+
+和` reflect.Type` 类似, `reflect.Value` 也满足` fmt.Stringer` 接口, 但是除非 `Value `持有的是字符串, 否则 `String `方法只返回其类型. 而使用 `fmt `包的 `%v `标志参数会对 `reflect.Values `特殊处理。
+
+对 `Value `调用 `Type `方法将返回具体类型所对应的 `reflect.Type`:
+
+```Go
+t := v.Type()           // a reflect.Type
+fmt.Println(t.String()) // "int"
+```
+
+`reflect.ValueOf `的逆操作是 `reflect.Value.Interface `方法. 它返回一个 `interface{}` 类型，装载着与` reflect.Value` 相同的具体值:
+
+```Go
+v := reflect.ValueOf(3) // a reflect.Value
+x := v.Interface()      // an interface{}
+i := x.(int)            // an int
+fmt.Printf("%d\n", i)   // "3"
+```
+
+` reflect.Value `和 `interface{} `都能装载任意的值. 所不同的是, 一个空的接口隐藏了值内部的表示方式和所有方法, 因此只有我们知道具体的动态类型才能使用类型断言来访问内部的值(就像上面那样), 内部值我们没法访问. 相比之下, 一个 `Value `则有很多方法来检查其内容, 无论它的具体类型是什么。
+
+要从变量对应的可取地址的`reflect.Value`来访问变量需要三个步骤。第一步是调用`Addr()`方法，它返回一个`Value`，里面保存了指向变量的指针。然后是在`Value`上调用`Interface()`方法，也就是返回一个`interface{}`，里面包含指向变量的指针。最后，如果我们知道变量的类型，我们可以使用类型的断言机制将得到的`interface{}`类型的接口强制转为普通的类型指针。这样我们就可以通过这个普通指针来更新变量了：
+
+```Go
+x := 2
+d := reflect.ValueOf(&x).Elem()   // d refers to the variable x
+px := d.Addr().Interface().(*int) // px := &x
+*px = 3                           // x = 3
+fmt.Println(x)                    // "3"
+```
+
+或者，不使用指针，而是通过调用可取地址的`reflect.Value`的`reflect.Value.Set`方法来更新对应的值：
+
+```Go
+d.Set(reflect.ValueOf(4))
+fmt.Println(x) // "4"
+```
+
+Set方法将在运行时执行和编译时进行类似的可赋值性约束的检查。以上代码，变量和值都是int类型，但是如果变量是int64类型，那么程序将抛出一个panic异常，所以关键问题是要确保改类型的变量可以接受对应的值：
+
+```Go
+d.Set(reflect.ValueOf(int64(5))) // panic: int64 is not assignable to int
+```
+
+同样，对一个不可取地址的reflect.Value调用Set方法也会导致panic异常：
+
+```Go
+x := 2
+b := reflect.ValueOf(x)
+b.Set(reflect.ValueOf(3)) // panic: Set using unaddressable value
+```
+
+这里有很多用于基本数据类型的Set方法：SetInt、SetUint、SetString和SetFloat等。
+
+```Go
+d := reflect.ValueOf(&x).Elem()
+d.SetInt(3)
+fmt.Println(x) // "3"
+```
+
+从某种程度上说，这些Set方法总是尽可能地完成任务。以SetInt为例，只要变量是某种类型的有符号整数就可以工作，即使是一些命名的类型、甚至只要底层数据类型是有符号整数就可以，而且如果对于变量类型值太大的话会被自动截断。但需要谨慎的是：对于一个引用interface{}类型的reflect.Value调用SetInt会导致panic异常，即使那个interface{}变量对于整数类型也不行。
+
+ 反射可以越过Go语言的导出规则的限制读取结构体中未导出的成员 。 然而，利用反射机制并不能修改这些未导出的成员 。
+
+```Go
+stdout := reflect.ValueOf(os.Stdout).Elem() // *os.Stdout, an os.File var
+fmt.Println(stdout.Type())                  // "os.File"
+fd := stdout.FieldByName("fd")
+fmt.Println(fd.Int()) // "1"
+fd.SetInt(2)          // panic: unexported field
+```
+
+一个可取地址的reflect.Value会记录一个结构体成员是否是未导出成员，如果是的话则拒绝修改操作。因此，CanAddr方法并不能正确反映一个变量是否是可以被修改的。另一个相关的方法CanSet是用于检查对应的reflect.Value是否是可取地址并可被修改的：
+
+```Go
+fmt.Println(fd.CanAddr(), fd.CanSet()) // "true false"
+```
