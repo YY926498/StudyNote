@@ -168,3 +168,51 @@ func Unmarshal(val interface{},b []byte)(rest []byte, err os.Error)
 ~~~
 
 前一个将数据值编组成序列化的字节数组，后一个将其解组出来，需要对interface类型的参数进行更多的类型检查。
+
+## HTTP
+
+HTTP协议是无状态的，面向连接的和可靠的。
+
+HTTP1.1新增：
+
+1. 主机名识别（支持虚拟主机）
+2. 内容协商（多语言）
+3. 持久连接（降低TCP开销）
+4. 分块传送
+5. 字节范围（请求文件部分内容）
+6. 代理支持
+
+### 简单用户代理（`User agent`）
+
+~~~GO
+func Head(url string)(r *Response, err os.Error)
+~~~
+
+该函数可用来发起`HEAD`请求
+
+### `GET`请求
+
+希望接收到一个资源内容而不是有关信息
+
+~~~go
+func Get(url string)(r *Response, finalURL string, err os.Error)
+~~~
+
+### `Request`请求
+
+~~~go
+reuest, err := http.NewRequest("GET",url.String(),nil)
+~~~
+
+请求创建成功后，可以修改其内容字段。
+
+~~~go
+request.Header.Add("Accept-Charset","UTF-8;q=1,ISO-8859-1;q=0")
+~~~
+
+上述调用是指定只接受`UTF-8`。
+
+### 客户端对象
+
+向服务器发送一个请求并取得回复，最简单的方法是使用对象`Client`。此对象可以管理多个请求，并处理一些问题，如与服务器间的`TCP`连接是否保持活动状态等。
+
