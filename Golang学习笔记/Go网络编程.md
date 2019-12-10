@@ -216,3 +216,30 @@ request.Header.Add("Accept-Charset","UTF-8;q=1,ISO-8859-1;q=0")
 
 向服务器发送一个请求并取得回复，最简单的方法是使用对象`Client`。此对象可以管理多个请求，并处理一些问题，如与服务器间的`TCP`连接是否保持活动状态等。
 
+### 文件服务器
+
+~~~go
+fileserver := http.FileServer(http.Dir("/home"))
+
+err:=http.ListenAndServer(":8000",fileserver)
+~~~
+
+### 处理函数
+
+调用方式：
+
+~~~go
+func Handle(pattern string, handler Handler)
+func HandleFunc(pattern string, handler func(*Conn, *Request))
+~~~
+
+### 绕过默认的`multiplexer`
+
+Go服务器接收到的`HTTP`请求通常是由一个`multiplexer`进行处理的，检查`HTTP`请求的路径，然后调用一个合适的`handler`等等。
+
+也可以定义自己的handler。将一个匹配模板参数和一个函数作为参数，调用`http.HandleFunc`，可以将其注册为默认的`multiplexer`。像`ListenAndServer`这样的函数可以使用`nil`作为`handler function`。
+
+如果需要`multiplexer`，就可以给定一个非零函数作为handler function，这个函数将会全权负责管理请求和响应。
+
+## 模板
+
