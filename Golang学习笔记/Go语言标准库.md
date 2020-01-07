@@ -72,5 +72,172 @@ if err!=nil{
 fmt.Printf("%s, %d\n",p,n)
 ~~~
 
+输出：
+
+~~~go
+语言, 6
+~~~
+
+**WriteAt接口**
+
+~~~go
+type WriteAt interface{
+    WriteAt(p []byte, off int64)(n int, err error)
+}
+~~~
+
+说明：
+
+WriteAt从p中将len(p)个字节写入到偏移量off处的基本数据流中。它返回从p中被写入的字节数n(0<=n<=len(p))以及任何遇到的引起写入提前停止的错误。若WriteAt返回的n<len(p)，它就必须返回一个非nil的错误。
+
+若WriteAt按查找偏移量写入到目标中，WriteAt应当既不影响基本查找偏移量也不被它所影响。
+
+若区域没有重叠，WriteAt的客户端可对相同的目标并行执行WriteAt调用。
+
+~~~go
+file, err := os.Create("writeAt.txt")
+if err !=nil{
+    panic(err)
+}
+defer file.Close()
+file.WriteString("Golang中文社区")
+n, err:=file.WriteAt([]byte("Go语言学习园地"),24)
+if err != nil {
+    panic(err)
+}
+fmt.Println(n)
+~~~
+
+**ReadFrom和WriteTo接口**
+
+**ReadFrom定义如下**
+
+~~~go
+type ReadFrom interface{
+    ReadFrom(r Reader)(n int64, err error)
+}
+~~~
+
+说明：
+
+ReadFrom从r中读取数据，直到EOF或发生错误。其返回值n为读取的字节数。除了io.EOF之外，在读取过程中遇到的任何错误也将被返回。
+
+如果ReadFrom可用，Copy函数就会使用它。
+
+注：ReadFrom方法不会返回err==EOF。
+
+~~~go
+file, err := os.Open("writeAt.txt")
+if err != nil {
+    panic(err)
+}
+defer file.Close()
+writer := bufio.NewWriter(os.Stdout)
+writer.ReadFrom(file)
+writer.Flush()
+~~~
+
+**WriteTo定义如下**
+
+~~~go
+type WriteTo interface{
+    WriteTo(w Writer)(n int64, err error)
+}
+~~~
+
+说明：
+
+WriteTo将数据写入w中，直到没有数据可写或发生错误。其返回值n为写入的字节数。在写入的过程中遇到的任何错误也将被返回。
+
+如果WriteTo可用，Copy函数就会使用它。
+
+**Seeker接口**
+
+~~~go
+type Seeker interface{
+    Seek(offset int64, whence int)(ret int64, err error)
+}
+~~~
+
+说明：
+
+Seek设置下一次Read或Write的偏移量为offset，它的解释取决于whence:0表示相对于文件的起始处，1表示相对于当前的偏移，而2表示相对于结尾处。Seek返回新的偏移量和一个错误，如果有的话。
+
+whence的值在os包中定义了相应的常量。
+
+~~~go
+const (
+	SEEK_SET int = 0
+    SEEK_CUR int = 1
+    SEEK_END int = 2
+)
+~~~
+
+**Closer接口**
+
+~~~go
+type Closer interface{
+    Close() error
+}
+~~~
+
+注意：以下用法是错误的：
+
+~~~go
+file,err := os.Open("student.txt")
+defer file.Close()
+if err != nil {
+    ...
+}
+~~~
+
+当student.txt不存在或找不到时，file.Close()会panic，因为file是nil。因此应该将`defer file.Close()`放在错误检查之后。
+
+**ByteReader和ByteWriter接口**
+
+这两个接口是读或写一个字节。
+
+定义如下：
+
+~~~go
+type ByteReader interface {
+    ReadByte()(c byte, err error)
+}
+type ByteWriter interface {
+    WriteByte(c byte) error
+}
+~~~
+
+这两个接口一般在二进制数据或归档压缩时用的比较多。
+
+**ByteScanner、RuneReader和RuneScanner**
+
+~~~go
+type ByteScanner interface {
+    ByteReader
+    UnreadByte() error
+}
+~~~
+
+该接口内嵌了ByteReader接口，UnreadByte方法的意思是：将上一次ReadByte的字节还原，使得再次调用ReadByte返回的结果和上一次调用相同，也就是说，UnreadByte是重置上一次的ReadByte。注意，UnreadByte调用之前必须调用了ReadByte，且不能连续调用UnreadByte。即：
+
+~~~go
+buffer := bytes.NewBuffer([]byte{'a','b'})
+err ；= buffer。UnreadByte()
+~~~
+
+和
+
+~~~go
+buffer:=bytes.NewBuffer([]byte{'a','b'})
+buffer.ReadByte()
+err := buffer.UnreadByte()
+err := buffer.UnreadByte()
+~~~
+
+err都非nil。
+
+RuneReader接口和ByteReader类似，只是ReadRune方法读取单个UTF-8字符，返回其rune和该字符占用的字符数。
+
 
 
