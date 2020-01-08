@@ -239,5 +239,102 @@ err都非nil。
 
 RuneReader接口和ByteReader类似，只是ReadRune方法读取单个UTF-8字符，返回其rune和该字符占用的字符数。
 
+**ReadCloser、ReadSeeker、ReadWriteCloser、ReadWriteSeeker、ReadWriter、WriteCloser和WriteSeeker接口**
 
+这些接口是上面介绍的接口的两个或三个组合而成的新接口。例如：
+
+~~~go
+type ReadWriter interface{
+    Reader
+    Writer
+}
+~~~
+
+这是Reader和Writer接口的简单组合（内嵌）
+
+这些接口的作用是：有些时候同时需要某两个接口的所有功能，即必须同时实现了某两个接口的类型才能够被传入使用。
+
+**SectionReader类型**
+
+SectionReader是一个struct（没有任何导出的字段），实现了Read，Seek和ReadAt，同时，内嵌了ReadAt接口。结构定义如下：
+
+~~~go
+type SectionReader struct{
+    r 		ReadAt
+    base 	int64
+    off		int64
+    limit	int64
+}
+~~~
+
+该类型读取数据流中部分数据。
+
+~~~go
+func NewSectionReader(r ReaderAt, off int64, n int64)*SectionReader
+~~~
+
+NewSectionReader返回一个SectionReader，它从r中的偏移量off处读取n个字节后以EOF停止。
+
+这个类型的作用是：方便重复操作某一段section数据流；或者同时需要ReadAt和Seek的功能。
+
+**LimitedReader类型**
+
+~~~go
+type LimitedReader struct{
+    R 	Reader
+    N 	int64
+}
+~~~
+
+说明
+
+从R中读取但将返回的数据量限制为N字节。没调用一个Read都将更新N来反映新的剩余数量。最多只能返回N字节数据。LimitedReader只实现了Read方法。
+
+~~~go
+content := "This is LimitedReader example"
+reader := strings.NewReader(content)
+limitReader := &io.LimitedReader{R: reader, N: 8}
+for limitReader.N > 0 {
+    tmp := make([]byte, 3)
+    limitReader.Read(tmp)
+    fmt.Println(tmp, limitReader.N)
+}
+~~~
+
+输出：
+
+~~~go
+[84 104 105] 5
+Thi 5
+[115 32 105] 2
+s i 2
+[115 32 0] 0
+s 
+~~~
+
+可见，通过该类型可以达到只允许读取一定长度数据的目的。
+
+在io包中，。LimitReader函数的实现其实就是调用LimitedReader:
+
+~~~go
+func LimitReader(r Reader, n int64)Reader{return &LimitedReader{r,n}}
+~~~
+
+**PipeReader和PipeWriter类型**
+
+PipeReader（一个没有任何导出字段的struct）是管道的读取端。它实现了io.Reader和io.Closer接口。
+
+关于Read方法的说明：从管道中读取数据。该方法会堵塞，直到管道写入端开始写入数据或写入端关闭。如果写入端关闭时带上了error（即调用CloseWithError关闭），该方法返回的err就是写入端传递的error；否则err为EOF。
+
+PipeWriter（一个没有任何导出的字段的struct）是管道的写入端。它实现了io.Writer和io.Closer接口。
+
+关于Write方法的说明：写数据到管道中。该方法会阻塞，直到管道读取端读完所有数据或读取端关闭了。如果读取端关闭时带上了error（即调用CloseWithError关闭），该方法返回的err就是读取端传递的error；否则err为ErrClosedPipe。
+
+io.Pipe()用于创建一个同步的内存管道，函数签名：
+
+~~~go
+func Pipe()(*PipeReader, *PipeWriter)
+~~~
+
+将io.Reader连接到io.Writer。一端的读取匹配另一端的写入，直接在这两端之间赋值数据；它没有内部缓存。它对于并行调用Read和Write以及其他函数或Close来说都是安全的。一旦等待的I/O结束，Close就会完成。并行调用Read或并行调用Write也同样安全：同种类的调用将按顺序进行控制。因此，不能再同一个goroutine中进行读或写。
 
