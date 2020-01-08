@@ -338,3 +338,132 @@ func Pipe()(*PipeReader, *PipeWriter)
 
 将io.Reader连接到io.Writer。一端的读取匹配另一端的写入，直接在这两端之间赋值数据；它没有内部缓存。它对于并行调用Read和Write以及其他函数或Close来说都是安全的。一旦等待的I/O结束，Close就会完成。并行调用Read或并行调用Write也同样安全：同种类的调用将按顺序进行控制。因此，不能再同一个goroutine中进行读或写。
 
+**Copy和CopyN函数**
+
+~~~go
+func Copy(dst Writer, src Reader)(written int64, err error)
+~~~
+
+说明：
+
+Copy将src复制到dst，直到在src上到达EOF或发生错误。它返回复制的字节数，如果有的话，还会返回在复制时遇到的第一个错误。
+
+成功的Copy返回err\==nil，而非err==EOF。由于Copy被定义为从src读取直到EOF为止，因此它不会将来自Read的EOF当做错误来报告。
+
+若dst实现了ReaderFrom接口，其复制操作可通过使用dst.ReadFrom(src)实现。此外，若src实现了WriteTo接口，其复制操作可通过调用src.WriteTo(dst)实现。
+
+~~~go
+io.Copy(os.Stdout,strings.NewReader("Go语言学习"))
+~~~
+
+**CopyN函数**
+
+~~~go
+func CopyN(dst Writer,src Reader, n int64)(written int64, err errno)
+~~~
+
+说明：
+
+CopyN将n个字节从src复制到dst。它返回复制的字节数以及在复制时遇到的最早的错误。由于Read可以返回要求的全部数量及一个错误（包括EOF），因此CopyN也能如此。
+
+若dst实现了ReaderFrom接口，复制操作就会使用它来实现。
+
+**ReadAtLeast和ReadFull函数**
+
+~~~go
+func ReadAtLeast(r Reader, buf []byte,min int)(n int, err error)
+~~~
+
+说明：
+
+ReadAtLeast将r读取到buf中，直到读取了最少min个字节为止。它返回复制的字节数，如果读取的字节较少，还会返回一个错误。若没有读取到字节，错误就只是EOF。如果一个EOF发生在读取了少于min个字节之后，ReadAtLeast就会返回ErrUnecpectedEOF。若min大于buf的长度，ReadAtLeast就会返回ErrShortBuffer。对于返回值，当且仅当err==nil时，才有n>=min。
+
+**ReadFull函数**
+
+~~~go
+func ReadFull(r Reader, buf []byte)(n int, err error)
+~~~
+
+说明：
+
+ReadFull精确地从r中将len(buf)个字节读取到buf中。它返回复制的字节数，如果读取的字节较少，还会返回一个错误。若没有读取到字节，错误就只是EOF。如果一个EOF发生在读取了一些但不是所有的字节后，ReadFull就会返回ErrUnexpectedEOF。对于返回值，当且仅当err\==nil时，才有n==len(buf)。
+
+**WriteString函数**
+
+~~~go
+func WriteString(w Writer, s string)(n int, err error)
+~~~
+
+**MultiReader和MultiWriter函数**
+
+~~~go
+func MultiReader(readers ...Reader)Reader
+func MultiWriter(writers ...Writer)Writer
+~~~
+
+MultiReader只是逻辑上将多个Reader组合起来，并不能通过调用一次Read方法获取所有Reader的内容。在所有的Reader内容都被读取完成后，Reader会返回EOF。
+
+如果是MultiWriter，就会将一份内容复制到多个Writer中，同时输出。
+
+**TeeReader函数**
+
+~~~go
+func TeeReader(r Reader, w Writer) Reader
+~~~
+
+该函数返回一个Reader，它将从r中读到的数据写入到w中。所有经由它处理的从r的读取都匹配于对应的对w的写入。它没有内部缓存，即写入必须在读取完成前完成。任何在写入时遇到的错误都将作为读取错误返回。
+
+### ioutil-方便的IO操作函数集
+
+**NopCloser函数**
+
+包装一个io.Reader，返回一个io.ReadCloser，相应的Close方法啥也不做，只是返回一个nil。
+
+**ReadAll函数**
+
+一次性读取io.Reader中的数据。
+
+~~~go
+func ReadAll(r io.Reader)([]byte,error)
+~~~
+
+**ReadDir函数**
+
+读取目录并返回排好序的文件和子目录名([]os.FileInfo)。
+
+**ReadFile和WriteFile函数**
+
+ReadFile读取整个文件的内容。
+
+~~~go
+func WriteFile(filename string, data []byte, perm os.FileMode) error
+~~~
+
+将data写入filename文件中，当文件不存在时，会创建一个（文件权限有perm指定）；否则会先清空文件内容。对于perm参数，一般指定为0666。
+
+**TempDir和TempFile函数**
+
+~~~go
+func TempDir(dir, prefix string) (name string, err error) 
+~~~
+
+第一参数如果为空，表明在系统默认的临时目录中创建临时目录；第二个参数指定临时目录名的前缀，该函数返回临时目录的路径。
+
+~~~go
+func TempFile(dir, pattern string) (f *os.File, err error)
+~~~
+
+与TempDir类似。
+
+注意：创建者创建的临时文件和临时目录要负责删除这些临时的目录和文件。
+
+**Discard变量**
+
+Discard对应的类型(type devNull int)实现了io.Writer接口，同时，为了优化io.Copy到Discard，避免不必要的工作，实现了io.ReaderFrom接口。
+
+~~~go
+func (devNull)Write(p []byte)(int,error){
+    return len(p),nil
+}
+~~~
+
