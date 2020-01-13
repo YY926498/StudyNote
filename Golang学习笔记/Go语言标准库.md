@@ -592,7 +592,8 @@ type GoStringer interface{
 
 ~~~go
 func NewReader(rd io.Reader)*Reader{
-    
+    //默认缓存大小:defaultBufSize = 4096
+    return NEwReaderSize(rd,defaultBufSize)
 }
 ~~~
 
