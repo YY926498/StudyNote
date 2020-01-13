@@ -467,3 +467,132 @@ func (devNull)Write(p []byte)(int,error){
 }
 ~~~
 
+### fmt-格式化IO
+
+**占位符**
+
+| 占位符 |                     说明                      |
+| :----: | :-------------------------------------------: |
+|   %v   |               相应值的默认格式                |
+|  %+v   |           打印结构体时，添加字段名            |
+|  %#v   |              相应值的Go语法表示               |
+|   %T   |           响应值的类型的Go语法表示            |
+|   %%   |        字面上的百分号，并非值的占位符%        |
+|   %t   |                单词true或false                |
+|   %b   |                  二进制表示                   |
+|   %c   |         响应的Unicode码点所表示的字符         |
+|   %d   |                  十进制表示                   |
+|   %o   |                  八进制表示                   |
+|   %q   | 单/双引号围绕的字符字面值，由Go语法安全地转移 |
+| %x  %X |                 十六进制表示                  |
+|   %U   |              Unicode格式：U+1234              |
+|   %s   |        输出字符串表示(string或[]byte)         |
+|   %    |             十六进制表示，前缀0x              |
+|   +    |              总打印数值的正负号               |
+|   -    |        在右侧而非左侧填充空格，左对齐         |
+|   #    |              备用格式，添加前缀               |
+
+**规则**：
+
+- 若一个操作数实现了error接口，Error方法就能将该对象装换为字符串，随后根据占位符的需要进行格式化
+- 若一个操作数实现了String()string方法，该方法能将该对象转换为字符串，随后根据占位符的需要进行格式化
+
+为了避免以下这类递归的情况：
+
+~~~go
+type X string
+func (x X)String() string{return Sprintf("<%s>",x)}
+~~~
+
+需要在递归前转换该值：
+
+~~~go
+func (x X)String() string{return Sprintf("<%s>",string(x))}
+~~~
+
+一组类似的函数通过扫描已格式化的文本来产生值。Scan、Scanf和Scanln从os.Stdin中读取；Fscan、Fscanf和Fscanln从指定的io.Reader中读取；
+
+Sscan、Sscanf和Sscanln从实参字符串中读取。Scanln、Fscanln和Sscanln在换行符处停止扫描，且需要条目紧随换行符之后，Scanf、Fscanf和Sscanf需要输入换行符来匹配格式中的换行符，其他函数则将换行符视为空格。
+
+在所有的扫描参数中，若一个操作数实现了Scan方法（即它实现了Scanner接口），该操作数将使用该方法扫描其文本。此外，若已扫描的实参数少于提供的实参数，就会返回一个错误。
+
+所有需要被扫描的额实参都必须是基本类型或Scanner接口的实现。
+
+**Stringer接口**
+
+~~~go
+type Stringer interface{
+    String() string
+}
+~~~
+
+**Formatter接口**
+
+~~~go
+type Formatter interface{
+    Format(f State, c rune)
+}
+~~~
+
+**Formatter接口由带有定制的格式化器的值所实现。Format的实现可调用Sprintf或Fprintf(f)等函数来生成其输出。**
+
+~~~go
+type Person struct{
+    Name 	string
+    Age		int
+    Sex		int
+}
+func (this *Person)Format(f fmt.State, c rune){
+    if c=='L'{
+        f.Write([]byte(this.String()))
+        f.Write([]byte(" Person has three fields."))
+    }else{
+        //没有这句，会导致fmt.Printf("%s",p)啥也不输出
+        f.Write([]byte(fmt.Sprintln(this.String())))
+    }
+}
+~~~
+
+注：
+
+1. fmt.State是一个接口。由于Format方法是被fmt包调用的，它内部会实例化好一个fmt.State接口的实例。
+2. 可以实现自定义占位符，同时fmt包中和类型相对应的预定义占位符会无效。因此例子中Format的实现加入了else子句。
+3. 实现了Formatter接口，相应的String接口不起作用。但实现了Formatter接口的类型应该实现Stringer接口，这样方便在Format方法中调用String方法。
+4. Format方法的第二个参数是占位符中%后的字母（有精度和宽度会被忽略，只保留字母）。
+
+**GoStringer接口**
+
+~~~go
+type GoStringer interface{
+    GoString() string
+}
+~~~
+
+该接口定义了类型的Go语法格式。用于打印Print格式化占位符为%#v的值。一般不需要实现该接口。
+
+**Scan序列函数**
+
+对于`Scan/Fscan/Sscan`这组函数将连续由空格分隔的值存储为连续的实参（换行符也记为空格）。
+
+对于`Scnaf/Fscanf/Sscanf`这组函数将连续由空格分隔的值存储为连续的实参，其格式有`format`决定，换行符处停止扫描。
+
+对于`Scanln/Fscanln/Sscanln`表现和上一组一样，遇到“\n”停止。
+
+一般地，使用`Scan/Scanf/Scanln`这组函数。
+
+**Scanner和ScanState接口**
+
+任何实现了Scan方法的对象都实现了Scanner接口，Scan方法会从输入读取数据并将处理结果存入接收端，接收端必须是有效的指针。Scan方法接收的第一个参数为ScanState接口类型。
+
+**bufio-缓存IO**
+
+**bufio.Reader结构包装了一个io.Reader对象，提供了缓存功能，同时实现了io.Reader接口。**
+
+实例化：
+
+~~~go
+func NewReader(rd io.Reader)*Reader{
+    
+}
+~~~
+
