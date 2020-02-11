@@ -571,5 +571,75 @@ type DB struct{
 }
 ~~~
 
-## 使用MySQL数据库
+
+
+# session和数据存储
+
+web开发中一个很重要的议题就是如何做好用户的整个浏览过程的控制，因为HTTP是无协议的，所以用户的每一次请求都是无状态的，不知道在整个web操作过程中哪些连接与该用户有关。经典的解决方案是cookie个session，cookie机制是一种客户端机制，把用户数据保存在客户端，而session机制是一种服务端的机制，服务器使用一种类似于散列表的结构来保存信息，每一个网站访客都会被分配给一个唯一的标志符，即sessionID，它的存放形式无非两种：要么经过url传递，要么保存在客户端的cookie里，当然也可以把sessionID保存到数据库里，这样会更安全，但效率方面会有所下降。
+
+## session和cookie
+
+cookie简而言之是在本地计算机保存一些用户操作的历史信息（当然包括登录信息），并在用户再次访问该站点时浏览器通过HTTP协议将本地cookie内容发送给服务器，从而完成验证，或继续上一步操作。
+
+session简而言之是在服务器上保存用户操作的历史信息。服务器使用sessionID来标识session，sessionID由服务器负责产生，保证随机性和唯一性，相当于一个随机密钥，避免在我手或传输中暴露用户真实密码。但该方式下，仍然需要将发送请求的客户端与session进行对应，所以可以借助cookie机制来获取客户端的标识（即sessionid），也可以通过GET方式将id提交给服务器。
+
+**cookie**
+
+由浏览器维持的，存储在客户端的一小段文本信息，伴随着用户请求和页面在web服务器和浏览器之间传递。用户每次访问站点时，web应用程序都可以读取cookie包含的信息。浏览器设置里面有cookie隐私数据选项。
+
+cookie是有时间限制的，根据生命期不同分为两种：会话cookie和持久cookie。
+
+如果不设置过期时间，则表示这个cookie生命周期为从创建到浏览器关闭为止，只要不关闭浏览器窗口，cookie就消失。这种生命期为浏览会期的cookie被称为会话cookie。会话cookie一般不保存在硬盘上而是保存在内存中。
+
+如果设置了过期时间，浏览器就会把cookie保存到硬盘上，关闭后再次打开浏览器，这些cookie依然有效直到超过设定的过期时间。存储在硬盘上的cookie可以在不同的浏览器进程间共享，比如两个IE窗口。而对于保存在内存的cookie，不同的浏览器有不同的处理方式。
+
+**Go设置cookie**
+
+~~~go
+http.SetCookie(w responseWriter, cookie *Cookie)
+//w表示需要写入的response，cookie是一个struct
+type Cookie struct {
+	Name  string
+	Value string
+
+	Path       string    // optional
+	Domain     string    // optional
+	Expires    time.Time // optional
+	RawExpires string    // for reading cookies only
+
+	// MaxAge=0 means no 'Max-Age' attribute specified.
+	// MaxAge<0 means delete cookie now, equivalently 'Max-Age: 0'
+	// MaxAge>0 means Max-Age attribute present and given in seconds
+	MaxAge   int
+	Secure   bool
+	HttpOnly bool
+	SameSite SameSite
+	Raw      string
+	Unparsed []string // Raw text of unparsed attribute-value pairs
+}
+~~~
+
+设置cookie:
+
+~~~go
+expireation := *time.LocalTime()
+expiration.Yead +=1
+cookie := http.Cookie{Name:"username", Value:"astaxie", Expires : expiration}
+http.SetCookie(w,&cookie)
+~~~
+
+**Go读取cookie**
+
+~~~go
+cookie, _ := r.Cookie("username")
+fmt.Fprint(w,cookie)
+//另一种读取方式
+for _,cookie := range r.Cookies(){//注意：r.Cookie和r.Cookies是两个函数
+    fmt.Fprint(w,cookie.Name)
+}
+~~~
+
+**session**
+
+
 
