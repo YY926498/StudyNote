@@ -674,7 +674,149 @@ session的基本原理是由服务器为每一个会话维护一份信息数据�
 -   session的存储（可以存储到内存、文件、数据库等）
 -   session过期处理
 
-**session管理器**
+**session劫持防范**
+
+一个解决方案是sessionID的值只允许cookie设置，而不是通过URL重置方式设置，同时设置cookie的httponly为true，这个属性是设置是否可通过客户端脚本访问这个设置的cookie。第一，这个可以防止cookie被XSS读物从而引起session劫持。第二，cookie设置不会像URL重置方式那么容易获取sessionID。
+
+第二步就是在每个请求里面加上token，实现类似防止form重复递交类似的功能，在每个请求里面加上一个隐藏的token，然后每次验证这个token，从而保证用户的请求都是唯一性的。
+
+**间隔生成新的SID**
+
+另一个解决方案是：给session额外设置一个创建时间的值，一旦过了一定的时间，就销毁这个sessionID，重新生成新的sessionID,，这样可以一定程度上防止session劫持的问题。
+
+
+
+# 文本处理
+
+## XML处理
+
+**解析XML**
+
+可以通过xml包里的Unmarshal函数达到目的：
+
+~~~go
+func Unmarshal(data []byte, v interface{})error
+~~~
+
+其中data接收的是XML数据流，v是需要输出的结构，定义为interface{}，就是可以把XML转换成任意格式。目前支持struct，slice和string。XML包内部采用反射来进行数据的映射，所以v里面的字段必须是导出的。Unmarshal解析的时候XML元素和字段怎么对应起来：这是一个优先级读取流程，首先会读取struct tag，如果没有，那么就会对应字段名。必须注意一点的是解析的时候tag、字段名和XML元素都是大小写敏感的，所以必须一一对应字段。
+
+解析XML到struct的时候遵循如下规则：
+
+-   如果struct的一个字段是string或者[]byte类型且它的tag含有`“,innerxml”`，Unmarshal将会对此字段所对应的元素内嵌的原始xml累加到此字段上
+-   如果struct字段中有一个叫做XMLName，且类型为xml.Name子弹，那么在解析的时候就会保存这个element的名字到该字段
+-   如果某个struct字段的tag定义中含有XML结构中element的名称，那么解析的时候就会把相应的element值赋值给该字段
+-   如果某个struct字段的tag定义中含有`“,attr”`，那么解析的时候就会将该结构对应的element的与字段同名的属性的值赋值给该字段
+-   如果某个struct字段的tag定义型如：`“a>b>c”`， 则解析的时候，会将xml结构a下面的b下面的c元素的值赋值给该字段
+-   如果某个struct字段的tag定义了`“-”`，那么不会为该字段解析匹配任何xml数据
+-   如果某个struct字段后面的tag定义了`“,any”`，那么如果他的子元素在不满足其他的规则的时候就会匹配到这个字段
+-   如果某个XML元素包含一条或者多条注释，那么这些注释将被累加到第一个tag含有`“,comments”`的字段上，这个字段的类型可能是[]byte或string，如果没有这样的字段存在，那么注释将会被抛弃
+
+注：为了正确解析，Go语言的xml包要求struct定义中的所有字段必须是可导出的。
+
+**输出XML**
+
+~~~go
+func Marshal(v interface{})([]byte error)
+func MarshalIndent(v interface{},prefix, indent string)([]byte, error)
+~~~
+
+注意：上述两个函数输出的信息都不带xml头的，因此，需要手动加入`xml.Header`。
+
+xml包生成相应的xml文件规则：
+
+-   如果v是array或者slice，那么输出每一个元素，类似value
+-   如果v是指针，那么会Marshal指针指向的内容，如果指针为空，什么都不输出
+-   如果v是interface，那么就处理interface包含的数据
+-   如果v是其他数据类型，就会输出这个数据类型所拥有的字段信息
+
+生成的XML文件中的element的名字按照如下优先级从struct中获取：
+
+-   如果v是struct，XMLName的tag中定义的名称
+-   类型为xml.Name的名叫XMLName的字段的值
+-   通过struct中字段的tag来获取
+-   通过struct的字段名用来获取
+-   marshall的类型名称
+
+如何设置struct中字段的tag信息用来控制最终xml文件的生成：
+
+-   XMLName不会被输出
+-   tag中含有`“-”`的字段不会被输出
+-   tag中含有`“name,attr”`，会以name作为属性名，字段值作为值输出为这个XML元素的属性
+-   tag中含有`“,attr”`，会以这个struct的字段名作为属性名输出为XML元素的属性，类似上一条，只是这个name默认是字段名
+-   tag中含有`“,chardata”`，输出为xml的character data而非element
+-   tag中含有`“,innerxml”`，将会被原样输出，而不会进行常规的编码过程
+-   tag中含有`“,comment”`，将会被当作xml注释来输出，而不会进行常规的编码过程，字段值中不能含有`--`字符串
+-   tag中含有`“omitempty”`，如果该字段值的值为空值那么该字段就不会被输出到XML，空值包括：false,0,nil指针或nil接口，任何长度为0的array，slice，map或者string
+-   tag中含有`“a>b>c”`，那么就会循环输出三个元素a包含b，b包含c，例如如下代码就会输出：
+
+~~~xml
+FirstName 	string	`xml:"name>first"`
+LastName	string	`xml:"name>last"`
+
+<name>
+    <first>Asta</first>
+    <last>Xie</last>
+</name>
+~~~
+
+## JSON处理
+
+**解析JSON**
+
+~~~go
+func Unmarshal(data []byte,v interface{}) error
+~~~
+
+-   首先查找tag含有JSON的key的可导出的struct字段（首字母大写）
+-   其次查找字段名与JSON的key相同的导出字段
+-   最后查找类似key或者key这样的除了首字母之外其他大小写不敏感的导出字段
+
+注：能够被赋值的字段必须是可导出字段（首字母大写）。同时JSON解析的时候只会解析能找到的字段，如果找不到的字段就会被忽略，这样的一个好处是：当接收到一个很大的JSON数据结构哦而却只想获取部分数据的时候，只需将想要的数据对应的字段名大写，即可解决。
+
+**解析到interface**
+
+JSON包中采用map[string]interface{}和[]interface{}结构来存储任意JSON对象和数组。Go类型和JSON类型的对应关系如下：
+
+-   bool代表JSON booleans
+-   float64代表JSON numbers
+-   nil代表JSON null
+
+针对JSON的输出，在定义struct tag的时候需要注意一下：
+
+-   字段的tag是“-”，那么这个字段就不会输出到JSON
+-   tag中带有自定义名称，那么这个自定义名称会出现在JSON的字段名中
+-   tag中如果带有`“omitempty”`选项，那么如果该字段值为空，就不会输出到JSON串中
+-   如果字段类型是bool,string,int,int64等，而tag中带有`“,string”`选项，那么这个字段在输出到JSON的时候会把该字段对应的值转换为JSON字符串。
+
+通过Marshal函数进行转换的时候，需要注意几点：
+
+-   JSON对象只支持string作为key，所以要编码一个map，那么必须是map[string]T这种类型
+-   Channel，complex和function是不能被编码成JSON
+-   嵌套的数据是不能被编码的，不然会让JSON编码进入死循环
+-   指针在编码的时候会输出指针指向的内容，而空指针会输出null
+
+## 正则处理
+
+**通过正则判断是否匹配**
+
+~~~go
+func Match(pattern string, b []byte)(matched bool, err error)
+func MatchReader(pattern string, r io.RuneReader)(matched bool, err error)
+func MatchString(pattern string, s string)(matched bool, err error)
+~~~
+
+上面三个函数实现了同一个功能，就是判断pattern是否和输入源匹配，匹配的话就返回true，如果解析正则错误则返回error。
+
+**解析正则**
+
+~~~go
+func Compile(expr string)(*Regexp,error)
+func CompilePOSIX(expr string)(*Regexp,error)
+func MustCompile(str string)*Regexp
+func MustCompilePOSIX(str string)*Regexp
+~~~
+
+CompilePOSIX和Compile的不同点在于POSIX必须使用POSIX语法，它使用最左最长方式搜索，而Compile是采用最左方式搜索（例如[a-z]{2,4}这样一个正则表达式，应用于“aa09aaa88aaaa”这个文本串时，CompilePOSIX返回aaaa,而Compile则返回的是aa）。前缀有Must的函数表示，在解析正则语法的时候，如果匹配模式串不满足正确的语法则直接panic，而不加Must的则只是返回错误。
 
 
 
