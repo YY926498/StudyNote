@@ -820,3 +820,70 @@ CompilePOSIX和Compile的不同点在于POSIX必须使用POSIX语法，它使用
 
 
 
+## 模板处理
+
+**模板中如何插入数据**
+
+字段操作
+
+Go语言的模板通过`{{}}`来包含需要在渲染时被替换的字段，`{{.}}`表示当前的对象，如果要访问当前对象的字段通过`{{.FieldName}}`，但是需要注意的是，这个字段必须是导出的，否则在渲染的时候就会报错
+
+**输出嵌套字段**
+
+如果字段里面还有对象，可以使用`{{with ...}}...{{end}}`和`{{range ...}}{{end}}`来进行数据的输出。
+
+-   `{{range}}`这个和Go语法里面的range类似，循环操作数据
+-   `{{with}}`操作是值当前对象的值，类似于上下文的概念，必须要是有效的地址
+
+**条件处理**
+
+在Go模板里面如果需要进行条件判断，可以使用和Go语言的if-else语法类似的方式来处理
+
+~~~go
+{{if .Flag}}
+	if部分
+{{else if .Flag1}}
+	else if部分
+{{else}}
+	else部分
+{{end}}
+~~~
+
+注意：if里面无法进行条件判断，只能是bool值
+
+**pipeline**
+
+~~~go
+{{. | html}}
+~~~
+
+类似于UNIX的pipeline，上述部分是将输出全部转化为html的实体。
+
+**模板变量**
+
+~~~go
+$variable := pipeline
+//详细例子
+{{with $x := "output" | printf "%q"}}{{$x}}{{end}}
+{{with $x := "output"}}{{$x}}{{end}}
+{{with $x := "output"}}{{$x | printf "%q"}}{{end}}
+~~~
+
+**模板函数**模板在输出对象的字段值时，采用了fmt包把对象转化成了字符串，但是有时候需求可能不是这样，比如进行字符串替换，此时需要自定义函数来实现这个功能。
+
+每一个模板函数都有一个唯一的名字，然后与一个Go函数关联，通过如下的方式关联
+
+~~~go
+type FuncMap map[string]interface{}
+~~~
+
+例如，想要email函数的模板函数名是emailDeal，它关联的Go函数名称是EmailDealWith，那么可以通过如下方式来注册这个函数：
+
+~~~go
+t = t.Funcs(template.FuncMap{"emailDeal":EmailDealWith})
+//EmailDealWith函数原型必须是
+func EmailDealWith(args ...interface{})string
+~~~
+
+
+
