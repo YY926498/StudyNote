@@ -1,0 +1,6 @@
+# IPv4与IPv6双栈通信
+
+- 如果一个IPv4的TCP客户指定一个IPv4地址以调用connect，或者一个IPv4的UDP客户指定一个IPv4地址以调用sendto，那么无需任何特殊处理。
+- 如果一个IPv6的TCP客户指定一个IPv6地址地址以调用connect，或者以一个IPv6的UDP客户指定一个IPv6地址以调用sendto，那么无需做任何特殊处理。
+- 如果一个IPv6的TCP客户指定一个IPv4映射的IPv6地址以调用connect，或者一个IPv6的UDP客户以指定一个IPv4映射的IPv6地址以调用sendto，那么内核检测到这个映射地址后改为发送一个IPv4数据报而不是IPv6数据报。
+- 不论调用connect还是调用sendto，IPv4客户都不能指定一个IPv6地址，因为16个字节的IPv6地址超出了IPv4的sockaddr_in结构中的in_addr成员结构的4字节长度。
