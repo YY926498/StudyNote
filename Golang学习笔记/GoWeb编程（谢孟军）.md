@@ -885,5 +885,66 @@ t = t.Funcs(template.FuncMap{"emailDeal":EmailDealWith})
 func EmailDealWith(args ...interface{})string
 ~~~
 
+示例代码如下：
 
+~~~go
+package main
+//Friend 里面存放名字
+type Friend struct {
+	Fname string
+}
+
+//Person 存放人员信息
+type Person struct {
+	UserName string
+	Emails   []string
+	Friends  []*Friend
+}
+
+//EmailDealWith 替换@
+func EmailDealWith(args ...interface{}) string {
+	ok := false
+	var s string
+	if len(args) == 1 {
+		s, ok = args[0].(string)
+	}
+	if !ok {
+		s = fmt.Sprint(args...)
+	}
+
+	//find the @ symbol
+	substrs := strings.Split(s, "@")
+	if len(substrs) != 2 {
+		return s
+	}
+	return strings.Join(substrs, "at")
+}
+func main() {
+	f1 := Friend{Fname: "yang.go"}
+	f2 := Friend{Fname: "yu"}
+	t := template.New("fieldname example")
+	t = t.Funcs(template.FuncMap{"emailDeal": EmailDealWith})
+	t, _ = t.Parse(`hello {{.UserName}}!
+					{{range .Emails}}
+						an Emails {{.|emailDeal}}
+					{{end}}
+					{{with .Friends}}
+					{{range .}}
+						my friend name is {{.Fname}}
+					{{end}}
+					{{end}}
+					`)
+	curstr := make([]string, 2)
+	curstr[0] = "yang@gmail.com"
+	curstr[1] = "yu@163.com"
+	p := Person{UserName: "YONGZHOU",
+		Emails:  curstr,
+		Friends: []*Friend{&f1, &f2}}
+	t.Execute(os.Stdout, p)
+}
+~~~
+
+**Must操作**
+
+作用是检测模板是否正确，例如大括号是否匹配，注释是否正确的关闭，变量是否正确的书写
 
