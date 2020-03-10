@@ -264,5 +264,23 @@ route.GET("/:name/:id", func(c *gin.Context) {
 })
 ~~~
 
+## 绑定头部
 
+~~~go
+type TestHeader struct {
+	Rate   int    `header:"Rate"`
+	Domain string `header:"Domain"`
+}
+r.GET("/", func(c *gin.Context) {
+    h := TestHeader{}
+    if err := c.ShouldBindHeader(&h); err != nil {
+        c.JSON(http.StatusBadRequest, err)
+        return
+    }
+    fmt.Printf("%#v\n", h)
+    c.JSON(http.StatusOK, gin.H{"Rate": h.Rate, "Domain": h.Domain})
+})
+~~~
+
+另外还可以绑定HTML检测
 
