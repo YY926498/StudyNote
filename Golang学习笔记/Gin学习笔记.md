@@ -282,5 +282,68 @@ r.GET("/", func(c *gin.Context) {
 })
 ~~~
 
-另外还可以绑定HTML检测
+## 另外还可以绑定HTML检测
+
+~~~go
+type myForm struct{
+    Colors []string `form:"colors[]"`
+}
+func formHandler(c *gin.Context){
+    var fakeForm myForm
+    c.ShouldBind(&fakeForm)
+    c.JSON(200,gin.H{"color":fakeForm.Colors})
+}
+~~~
+
+~~~html
+<form action="/" method="POST">
+    <p>
+        Check some colors
+    </p>
+    <label for="red">Red</label>
+    <input type="checkbox" name="colors[]" value="red" id="red">
+</form>
+~~~
+
+## 绑定Multipart/Urlencoded
+
+~~~go
+package main
+
+import (
+	"mime/multipart"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+type ProfileForm struct {
+	Name   string                `form:"name" binding:"required"`
+	Avatar *multipart.FileHeader `form:"avatar" binding:"required"`
+	//如果是多文件
+	//Avatar []*multipart.FileHeader `form:"avatar" binding:"required"`
+}
+
+func main() {
+	router := gin.Default()
+	router.POST("/profile", func(c *gin.Context) {
+		var form ProfileForm
+		//可以使用显式绑定声明：c.ShouldBindWith(&form,binding.Form)
+		//或者使用自动绑定：c.ShouldBind()
+		if err := c.ShouldBind(&form); err != nil {
+			c.String(http.StatusBadRequest, "bad request")
+			return
+		}
+		err := c.SaveUploadedFile(form.Avatar, form.Avatar.Filename)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "unknown error")
+			return
+		}
+		c.String(http.StatusOK, "OK")
+	})
+	router.Run()
+}
+~~~
+
+## 提交XML,JSON,YAML和ProtoBuf
 
