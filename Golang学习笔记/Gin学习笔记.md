@@ -347,3 +347,85 @@ func main() {
 
 ## 提交XML,JSON,YAML和ProtoBuf
 
+~~~go
+package main
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin/testdata/protoexample"
+
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.Default()
+	r.GET("/someJSON", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "hey", "status": http.StatusOK})
+	})
+	r.GET("/moreJSON", func(c *gin.Context) {
+		var msg struct {
+			Name    string `json:"user"`
+			Message string
+			Number  int
+		}
+		msg.Name = "Yang"
+		msg.Message = "hey"
+		msg.Number = 13
+		c.JSON(http.StatusOK, msg)
+	})
+	r.GET("/someXML", func(c *gin.Context) {
+		c.XML(http.StatusOK, gin.H{"message": "hey", "status": http.StatusOK})
+	})
+	r.GET("/someYAML", func(c *gin.Context) {
+		c.YAML(http.StatusOK, gin.H{"message": "hey", "status": http.StatusOK})
+	})
+	r.GET("/someProtoBuf", func(c *gin.Context) {
+		reps := []int64{int64(1), int64(2)}
+		label := "test"
+		data := &protoexample.Test{
+			Label: &label,
+			Reps:  reps,
+		}
+		c.ProtoBuf(http.StatusOK, data)
+	})
+	r.Run()
+}
+~~~
+
+## 安全JSON
+
+使用SecureJSON可以预防JSON劫持，如果结构体是一个数组类型，默认添加前缀`while(1),`
+
+~~~go
+/**
+* @Author: YangYu
+* @Date: 2020/3/16 10:38
+* @File: main
+* @Software: GoLand
+ */
+package main
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.Default()
+
+	r.GET("/someJSON", func(c *gin.Context) {
+		names := []string{"yang", "yu"}
+		c.SecureJSON(http.StatusOK, names)
+	})
+	r.Run()
+}
+
+//输出
+while(1);[
+    "yang",
+    "yu"
+]
+~~~
+
