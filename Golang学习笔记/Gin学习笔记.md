@@ -5,9 +5,24 @@
 ~~~go
 router := gin.router()
 //这个处理器匹配/user/yang，但是不匹配/user或者/user/
-router.GET("/user/:name",func(c *gin.Context){...})
+router.GET("/user/:name/*action", func(c *gin.Context) {
+    name := c.Param("name")
+    action := c.Param("action")
+    message := "get /:name/*action " + name + " is " + action
+    c.String(http.StatusOK, message)
+    fmt.Println("c.Params:", c.Params)
+})
 //这个处理器匹配/user/yang/和/user/yang/send,但是其中参数action带/，使用时需要处理
-router.GET("/user/:name/*action", func(c *gin.Context) {...})
+
+router.POST("/user/:name/*action", func(c *gin.Context) {
+    if c.FullPath() == "user/:name/*action" {
+        fmt.Println("true", c.Params)
+        c.String(http.StatusOK, "true")
+    } else {
+        fmt.Println("false", c.Params)
+        c.String(http.StatusOK, "false")
+    }
+})
 ~~~
 
 ## Querystring parameters
