@@ -205,4 +205,75 @@ VARCHAR需要使用1或2个字节记录字符串的长度：如果列的最大�
 
 BLOB和TEXT都是为存储很大的数据而设计的字符串数据类型，分别采用二进制和字符方式存储。
 
-字符类型是TINYTEXT，SMALLTEXT，TEXT，MEDIUMTEXT，LONGTEXT，对应的二进制类型是TINYBLOB，SMALLBLOB，
+字符类型是TINYTEXT，SMALLTEXT，TEXT，MEDIUMTEXT，LONGTEXT，对应的二进制类型是TINYBLOB，SMALLBLOB，BLOB是SMALLBLOB的同义词，TEXT是SMALLTEXT的同义词。
+
+当BLOB和TEXT的值太大是，InnoDB会使用专门的外部存储区域来进行存储，此时每个值在行内需要1~4个字节来存储一个指针，然后在外部存储区域存储实际的值。
+
+**BLOB和TEXT家族之间仅有的不同是BLOB类型存储的是二进制数据，没有排序规则或字符集，而TEXT类型有字符集和排序规则。**
+
+MySQL对BLOB和TEXT列进行排序：只对每个列的最前max_sort_length字节而不是整个字符串做排序。如果只需要排序前面一小部分字符，则可以减少max_sort_length的配置，或者使用ORDER BY SUBSTRING(column,length)。
+
+MySQL不能讲BLOB和TEXT列全部长度的字符串进行索引，也不能使用这些索引消除排序。
+
+**磁盘临时表和文件排序**
+
+因为Memory引擎不支持BLOB和TEXT类型，所以，查询使用了BLOB和TEXT列并且需要使用隐式临时表，将不得不使用MyISAM磁盘临时表，即使只有几行数据也是如此。最好的解决方案是尽量避免使用BLOB和TEXT类型。如果实在无法避免，有一个技巧是在所有用到BLOB字段的地方都使用SUBSTRING(column,length)将列值转换为字符串在ORDER BY子句中也适用。这样就可以使用内存临时表，但是要确保截取的子字符串足够短，不会使临时表的大小超过max_heap_table_size或tmp_table_size，超过以后，MySQL会将内存临时表转换为MyISAM磁盘临时表。
+
+最坏的情况下的长度分配对于排序的时候也是一样。
+
+**使用枚举代替字符串类型**
+
+MySQL在存储枚举时非常紧凑，会根据列表值的数量压缩到一个或者两个字节中。MySQL在内部会将每个值在列表中的位置保存为整数，并且在表的`.frm`文件中保存`数字-字符串`映射关系的“查找表”。
+
+例如：
+
+~~~mysql
+CREATE TABLE enum_test(
+	e ENUM('fish','apple','dog') NOT NULL
+);
+
+INSERT INTO enum_test (e) VALUES ('fish'),('dog'),('apple');
+SELECT e+0 FROM enum_test;//其中e+0结果变为数字
+
+//结果：
+1
+3
+2
+~~~
+
+**枚举字段是按照内部存储的整数而不是定义的字符串进行排序**
+
+~~~mysql
+SELECT e FROM enum_test ORDER BY e;
+//结果
+fish
+apple
+dog
+~~~
+
+一种绕过这种限制的方式是按照需要的顺序来定义枚举列。另外也可以在查询中使用FIELD()函数显式地指定排序顺序，但这会导致MySQL无法利用索引消除排序。
+
+~~~mysql
+SELECT e FROM enum_test ORDER BY FIELD(e,'apple','fish','dog');
+~~~
+
+枚举最不好的地方是：字符串列表是固定的，添加或删除字符串必须使用ALTER TABLE。除非能接受只在列表末尾添加元素。
+
+### 日期和时间类型
+
+**DATETIME**：保存范围为：1001年到9999年，精度为秒。把日期和时间封装到格式为YYYYMMDDHHMMSS的整数中，与时区无关。使用8个字节的存储空间。
+
+**TIMESTAMP**：保存了从1970年1月1日午夜以来的秒数，和UNIX时间戳相同。TIMESTAMP只使用4个字节的存储空间，范围为1970年到2038年。提供FROM_UNIXTIME()函数把Unix时间戳转换为日期，并提供UNIX_TIMESTAMP()函数把日期转换为Unix时间戳。TIMESTAMP显式的值依赖于时区。
+
+两者的区别：如果在多个时区存储或访问数据，TIMESTAMP和DATETIME的行为将很不一样。前者提供的值与时区有关，后者则只保留文本表示的日期和时间。
+
+TIMESTAMP也有DATETIME没有的特殊属性。默认情况下，如果插入时没有指定第一个TIMESTAMP列的值，MySQL则设置这个列的值为当前时间。在插入一行记录时，MySQL默认也会更新第一个TIMESTAMP列的值，除非在UPDATE语句中明确指定了值。TIMESTAMP列默认为NOT NULL，这和其他数据类型不一样。
+
+除了特殊行为之外，通常应该尽量使用TIMESTAMP，因为比DATETIME空间效率更高。
+
+如果要存储比秒更小粒度的日期和时间值，可以使用BIGINT类型存储微妙级别的时间戳，或者使用DOUBLE存储秒之后的小数部分。
+
+### 位数据类型
+
+**BIT**
+
