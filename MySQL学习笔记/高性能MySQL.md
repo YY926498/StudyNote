@@ -496,3 +496,70 @@ ALTER TABLE ska.film ALTER COLUMN ren SET DEFAULT 5;
 3.  交换`.frm`文件
 4.  执行UNLOCK TABLES来释放第2步的读锁。
 
+示例：
+
+为film表的rating列增加一个常量。
+
+~~~mysql
+CREATE TABLE IF NOT EXISTS film(
+	Id int(8) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	rating ENUM('G','PG','PG-13','R','NC-17') NOT NULL DEFAULT 'G'
+)ENGINE = InnoDB,CHARSET=utf8mb4;
+
+SHOW COLUMNS FROM web.film LIKE 'rating';
+
+CREATE TABLE IF NOT EXISTS web.film_new LIKE web.film;
+ALTER TABLE web.film_new
+//注意ENUM新增变量应该放在最后，因为ENUM内部存储的是数值，如果增加在前面，将会导致一部分值的意思出现变化
+MODIFY COLUMN rating ENUM('G','PG','PG-13','R','NC-17','PG-14')
+DEFAULT 'G';
+FLUSH TABLES WITH READ LOCK;
+//在此时替换film的.frm文件
+UNLOCK TABLES;
+~~~
+
+### 快速创建MyISAM索引
+
+为了高效地载入数据到MyISAM表中，一个常用的技巧是先禁用索引、载入数据，然后重新启用索引：
+
+~~~mysql
+ALTER TABLE test.load_data DISABLE KEYS;
+//载入数据
+ALTER TABLE test.load_data ENABLE KEYS;
+~~~
+
+这个技巧是因为构建索引的工作被延迟到数据完全载入以后，这个时候已经可以通过排序来构建索引，这样做会快很多，并且可以使得索引树的碎片更少。更紧凑。
+
+但是，这个方法对唯一索引无效，因为DISABLE KEYS只对非唯一索引有效。MyISAM会在内存中构造唯一索引，并且为载入的每一行检查唯一性。一旦索引的大小超过了有效内存大小，载入操作就会变得越来越慢。
+
+对InnoDB，也有类似的技巧，依赖于InnoDB的快速在线索引创建功能。即先删除所有的非唯一索引，然后增加新的列，最后重新创建删除掉的索引。这个方法是在已经知道所有数据都是有效的并且没有必要做唯一性检查时可以这样来操作。
+
+操作步骤：
+
+1.  用需要的表结构创建一张表，但是不包括索引。
+2.  载入数据到表中以构建`.MYD`文件
+3.  按照需要的结构创建另外一张空表，这次要包含索引。这会创建`.frm`和`.MYI`文件
+4.  获取读锁并刷新锁
+5.  重命名第二张表的`.frm`和`.MYI`文件，让MySQL认为是第一张表的文件
+6.  释放读锁
+7.  使用REPAIR TABLE来重建表的索引。该操作会通过排序来构建所有索引，包括唯一索引。
+
+这个操作步骤对大表来说会快很多。
+
+## 总结
+
+设计原则：尽可能保持任何东西小而简单总是好的。一些原则如下：
+
+-   尽量避免过度设计，例如会导致极其复杂的schema设计，或者有很多列的表设计
+-   使用小而简单的合适数据类型，除非真实数据模型中有确切的需要，否则应该尽可能地避免使用NULL值
+-   尽量使用相同的数据类型存储相似或相关的值，尤其要在关联条件中使用的列
+-   注意可变长字符串，其在临时表和排序时可能导致悲观的按最大长度分配内存。
+-   尽量使用整数定义标识列
+-   避免使用MySQL已经遗弃的特性，例如指定浮点数的精度，或者整数的显式宽度
+-   小心使用ENUM和SET。虽然他们使用起来很方便，但是不要滥用，否则有时候会变成陷阱。最好避免使用BIT。
+
+
+
+# 创建高性能的索引
+
+索引是存储引擎用于快速找到记录的一种数据结构。这是索引的基本功能。
