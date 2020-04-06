@@ -656,3 +656,42 @@ CREATE TABLE testhash(
 -   哈希索引只支持等值比较查询，包括=、IN()、<=>（注意<>和<=>是不同的操作，<=>是专门判断值是否等于NULL，如果值等于NULL，返回1，否则为0）。也不支持任何范围查询，例如`WHERE price > 100`。
 -   访问哈希索引的数据非常快，除非有哈希冲突。当出现哈希冲突的时候，存储引擎必须遍历链表中的所有的行指针，逐行进行比较，直到找到所有符合条件的行。
 -   如果哈希冲突很多的话，一些索引维护操作的代价非常高。例如，如果在某个选择性很低（哈希冲突很多）的列上建立哈希索引，那么当从表中删除一行时，存储引擎需要遍历对应哈希值的链表中的每一行，找到并删除对应行的引用，冲突越多，代价越大。
+
+因为这些限制，哈希索引只适用于某些特定的场合。而一旦适合哈希索引，则它带来的性能提升非常显著。
+
+InnoDB引擎中有一个特殊的功能叫做“自适应哈希索引”。当InnoDB注意到某些索引值被使用的非常频繁时，会在内存中基于B-Tree索引之上再创建一个哈希索引，这样就让B-Tree索引也具有哈希索引的一些优点，比如快速的哈希查找。这是一个完全自动的、内部的行为。
+
+**创建自定义哈希索引**：如果存储引擎不支持哈希索引，则可以模拟像InnoDB一样创建哈希索引。
+
+思路：在B-Tree基础上创建一个伪哈希索引。这和真正的哈希索引不是一回事，因为还是使用B-Tree进行查找，但是它使用哈希值而不是键不慎进行索引查找。需要做的就是在查询的WHERE子句中手动指定使用哈希函数。
+
+例如:
+
+~~~mysql
+SELECT id FROM url WHERE url = "http://www.mysql.com";
+//删除原来URL列上的索引，而新增一个url_crc列，使用crc32做哈希
+SELECT id FROM url WHERE url = "http://www.mysql.com"
+	AND url_crc = CRC32("http://www.mysql.com");
+~~~
+
+这样做性能较高，因为MySQL优化器会使用这个选择性很高而体积很小的基于url_crc列的索引来完成查找。
+
+这样实现的缺陷是需要维护哈希值。可以手动维护，也可以使用触发器实现。
+
+~~~mysql
+CREATE TABLE pseudohash(
+	id int unsigned NOT NULL auto_increment,
+    url varchar(255) NOT NULL,
+    url_crc int unsigned NOT NULL DEFAULT 0,
+    PRIMARY KEY(id)
+);
+DELIMITER	//
+CREATE TRIGGER pseudohash_crc_ins BEFORE INSERT ON pseudohash FOR EACH ROW BEGIN SET NEW.url_crc = crc32(NEW.url);
+END;
+//
+
+CREATE TRIGGER pseudohash_crc_upd BEFORE UPDATE ON pseudohash FOR ROW BEGIN SET NEW.url_crc = crc32(NEW.url);
+END;
+DELIMITER ;
+~~~
+
