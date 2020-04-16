@@ -77,8 +77,25 @@ template<class _RanIt,
 
 首先判断迭代器包裹的长度。如果长度大于32，进入while循环。
 
-其中`_Partition_by_median_guess_unchecked`函数作用是分类。然后划成三部分，继续调用`_Sort_unchecked`函数。
-
-其中快排会根据`_Ideal`，决定是否继续递归。每次都是上一次的3/4。
+其中`_Partition_by_median_guess_unchecked`函数作用是分类。然后划成三部分，比较前后两个区间的长度，对较短的那个区间继续调用`_Sort_unchecked`函数，同时会修改迭代器。不断迭代，直到迭代次数过多，退出循环。
 
 如果长度大于32，会进行堆排，当小于32时，进行插入排序。
+
+`_Pred`必须满足strict weak ordering。这个规则满足以下四条性质：
+
+-   非自反性：对于所有在集合S中的元素x，不可能有x<x
+-   不对称性：对于所有在集合S中的元素x,y，如果x<y，不可能有y<x
+-   可传递性：对于所有在集合S中的元素x,y,z，如果x<y，y<z，有x<z
+-   对于所有在集合S中的元素x,y,z，如果x=y，同时y=z，则有x=z。
+
+使用strict weak ordering运算符，可以表达其他所有的逻辑运算符
+
+-   <(a,b)：(a<b)
+-   <=(a,b)：!(b<a)
+-   ==（a,b)：!(a,b) && !(b,a)
+-   !=(a,b)：(a<b) || (b,a)
+-   \>(a,b)：(b<a)
+-   \>=(a,b)：!(a<b)
+
+如果不满足strict weak ordering，比如使用<=和>=符号，此时当a==b时，!(a<=b) && !(b<=a)并不为真
+
