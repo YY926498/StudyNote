@@ -77,7 +77,7 @@ template<class _RanIt,
 
 首先判断迭代器包裹的长度。如果长度大于32，进入while循环。
 
-其中`_Partition_by_median_guess_unchecked`函数作用是分类。然后划成三部分，比较前后两个区间的长度，对较短的那个区间继续调用`_Sort_unchecked`函数，同时会修改迭代器。不断迭代，直到迭代次数过多，退出循环。
+其中`_Partition_by_median_guess_unchecked`函数作用是分类。然后划成三部分，比较前后两个区间的长度，对较短的那个区间继续调用`_Sort_unchecked`函数，同时会修改迭代器。不断迭代，直到迭代次数过多，退出循环。其中_Ideal为0时，会跳出迭代，或者不进行递归。
 
 如果长度大于32，会进行堆排，当小于32时，进行插入排序。
 
