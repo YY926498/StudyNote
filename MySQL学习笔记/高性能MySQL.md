@@ -1302,3 +1302,38 @@ MySQL通过预估需要读取的数据页来选择，读取的数据页越少越
 
 ### 查询执行引擎
 
+执行计划死一个数据结构，然后查询执行引擎根据这个执行计划来完成整个查询。
+
+### 返回结果给客户端
+
+查询执行的最后一个阶段是将结果返回给客户端。即使查询不需要返回结果集给客户端，MySQL仍然会返回这个查询的一些信息。如果查询可以被缓存，那么MySQL在这个阶段会将结果存放到查询缓存中。
+
+MySQL将结果集返回客户端是一个增量、逐步返回的过程。一旦服务器处理完最后一个关联表，开始生成第一条结果时，MySQL就可以开始想客户端逐步返回结果集。
+
+好处：
+
+1.  服务端无须存储太多的结果
+2.  让客户端第一时间获得返回的结果。
+
+## MySQL查询优化器的局限性
+
+### 关联子查询
+
+MySQL的子查询实现得很糟糕。最糟糕的一类查询时WHERE条件中包含IN()的子查询语句。MySQL会将相关的外层表压到子查询中。例如：
+
+~~~mysql
+SELECT * FROM film
+WHERE film_id IN(
+	SELECT film_id FROM film_actor WHERE actor_id = 1
+);
+
+===>
+SELECT * FROM film
+WHERE EXISTS (
+	SELECT * FROM film_actor WHERE actor_id = 1 AND film_actor.film_id=film.film_id
+);
+~~~
+
+这时，子查询需要根据film_id来关联外部表film，因为需要film_id字段，所以MySQL认为无法先执行这个子查询。
+
+因为使用IN()加子查询，性能会非常糟，所以通常建议使用EXISTS()等效的改写查询来获得更好的效率。
