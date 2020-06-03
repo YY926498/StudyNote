@@ -1337,3 +1337,29 @@ WHERE EXISTS (
 这时，子查询需要根据film_id来关联外部表film，因为需要film_id字段，所以MySQL认为无法先执行这个子查询。
 
 因为使用IN()加子查询，性能会非常糟，所以通常建议使用EXISTS()等效的改写查询来获得更好的效率。
+
+
+
+### 松散索引扫描
+
+假设有如下索引`(a,b)`，有下面的查询：
+
+~~~mysql
+SELECT ... FROM tb1 WHERE b BETWEEN 2 AND 3;
+~~~
+
+因为索引的前导字段是列a，但是在查询中只指定了字段b，MySQL无法使用这个字段，从而只能通过全表扫描找到匹配的行。但是有个更快的方法执行上面的查询:索引的物理结构使得可以先扫描a列第一个值对应的b列的范围，然后再跳到a列的第二个不同值对应的b列的范围。这时就无须WHERE子句过滤，因为松散扫描已经跳过了所有不需要的记录。
+
+### 最大值和最小值优化
+
+~~~mysql
+SELECT MIN(actor_id) FROM actor WHERE first_name = 'PENELOPE';
+~~~
+
+因为first_name字段上没有索引，因此MySQL将会进行一次全表扫描。如果MySQL能够进行主键扫描，理论上，MySQL读到的第一个满足条件的记录的时候，就是要找的最小值。但此时MySQL只会做全表扫描，一个曲线的优化方法是：
+
+~~~mysql
+SELECT actor_id FROM actor USE INDEX(PRIMARY) 
+		WHERE first_name = 'PENELOPE' LIMIT 1;
+~~~
+
