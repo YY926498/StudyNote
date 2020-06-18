@@ -59,7 +59,7 @@ typedef struct dict {
 
 其中`prevlen`是变字节，当前面一个节点的长度小于254，则`prevlen`为1字节，如果前面一个节点的长度大于253，则`prevlen`为5字节，第一个字节为`0XFE`，表示分隔符。接下来四个字节表示前一个节点的长度。同样采用小端方式存储。
 
-`encoding`规则：如果是字符串，前两位按照sds的flags规则，如果是整型，则全部设置为1，接下来两位表示整型的类别。
+`encoding`规则：如果是字符串，根据后续数据的长度不同，前两位分别对应00,01,10，然后剩下6位，14位，38位代表后续的长度。如果是整型，则全部设置为1，接下来两位表示整型的类别。
 
 ~~~c
 |11000000| - 3 bytes  Integer encoded as int16_t (2 bytes).
@@ -74,4 +74,53 @@ typedef struct dict {
  *        |             |          |       |       |     |
  *     zlbytes        zltail    entries   "2"     "5"   end
 ~~~
+
+## quicklist-快速列表
+
+快速列表是通过双向列表和压缩列表结合在一起形成，其中每个节点构成双向列表，每个节点内部指向一个压缩列表。这样既可以享受压缩列表带来的内存高效利用，又尽量避免压缩列表插入和删除导致的连锁更新。
+
+结构如下：
+
+~~~c
+typedef struct quicklist {
+    quicklistNode *head;
+    quicklistNode *tail;
+    unsigned long count;        /* total count of all entries in all ziplists */
+    unsigned long len;          /* number of quicklistNodes */
+    int fill : QL_FILL_BITS;              /* fill factor for individual nodes */
+    unsigned int compress : QL_COMP_BITS; /* depth of end nodes not to compress;0=off */
+    unsigned int bookmark_count: QL_BM_BITS;
+    quicklistBookmark bookmarks[];
+} quicklist;
+~~~
+
+count代表整个列表中元素的总个数，list代表快速列表节点的个数，fill代表每个快速列表节点的压缩列表的长度，负数根据相应规则代表最大长度，正数代表最大个数。compress代表两端各有多少个节点不用压缩。
+
+其中每个节点的结构如下：
+
+~~~c
+typedef struct quicklistNode {
+    struct quicklistNode *prev;
+    struct quicklistNode *next;
+    unsigned char *zl;
+    unsigned int sz;             /* ziplist size in bytes */
+    unsigned int count : 16;     /* count of items in ziplist */
+    unsigned int encoding : 2;   /* RAW==1 or LZF==2 */
+    unsigned int container : 2;  /* NONE==1 or ZIPLIST==2 */
+    unsigned int recompress : 1; /* was this node previous compressed? */
+    unsigned int attempted_compress : 1; /* node can't compress; too small */
+    unsigned int extra : 10; /* more bits to steal for future usage */
+} quicklistNode;
+~~~
+
+`zl`指针指向的就是压缩列表。如果compress不为0，zl指向quickLZF结构。结构如下：
+
+~~~c
+typedef struct quicklistLZF {
+    unsigned int sz; /* LZF size in bytes*/
+    char compressed[];
+} quicklistLZF;
+~~~
+
+如果数据小于48字节，不会进行压缩，否则会调用`lzf_compress`函数进行压缩。
 
