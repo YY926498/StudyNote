@@ -124,3 +124,16 @@ typedef struct quicklistLZF {
 
 如果数据小于48字节，不会进行压缩，否则会调用`lzf_compress`函数进行压缩。
 
+## intset
+
+结构如下：
+
+~~~c
+typedef struct intset {
+    uint32_t encoding;
+    uint32_t length;
+    int8_t contents[];
+} intset;
+~~~
+
+一般用于set中全是整数的情形。分为：`INTSET_ENC_INT16` 、 `INTSET_ENC_INT32 `、`INTSET_ENC_INT64`三种。采用二分查找。
