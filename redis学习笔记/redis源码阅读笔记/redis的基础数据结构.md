@@ -137,3 +137,70 @@ typedef struct intset {
 ~~~
 
 一般用于set中全是整数的情形。分为：`INTSET_ENC_INT16` 、 `INTSET_ENC_INT32 `、`INTSET_ENC_INT64`三种。采用二分查找。
+
+## skiplist
+
+跳表的结构如下：
+
+~~~c
+typedef struct zskiplistNode {
+    sds ele;
+    double score;
+    struct zskiplistNode *backward;
+    struct zskiplistLevel {
+        struct zskiplistNode *forward;
+        unsigned long span;
+    } level[];
+} zskiplistNode;
+
+typedef struct zskiplist {
+    struct zskiplistNode *header, *tail;
+    unsigned long length;
+    int level;
+} zskiplist;
+~~~
+
+跳表中的每个节点会随机生成不大于32的层高，在插入时，由高层往底层依次确定待插入节点在当前层次的位置，并且更新当前层高的前后节点。
+
+## set
+
+redis中的set里的数据结构为哈希表或者intset。
+
+## zset
+
+~~~c
+typedef struct zset {
+    dict *dict;
+    zskiplist *zsl;
+} zset;
+~~~
+
+zset在数据量较小的时候为压缩列表，当元素较大或者元素个数较大时，就会从压缩列表转化为跳表。
+
+## Hyperloglog
+
+该数据结构主要用于不精确统计，当数据量较大的时候，使用的内存空间为12k、误差不超过9%。
+
+## geo-地理坐标
+
+~~~c
+typedef struct geoPoint {
+    double longitude;
+    double latitude;
+    double dist;
+    double score;
+    char *member;
+} geoPoint;
+
+typedef struct geoArray {
+    struct geoPoint *array;
+    size_t buckets;
+    size_t used;
+} geoArray;
+~~~
+
+暂时没有分析，以后遇到需要再进行分析
+
+## pub/sub
+
+主要根据建立的`channel`进行通信，每个通道维护一个引用计数。
