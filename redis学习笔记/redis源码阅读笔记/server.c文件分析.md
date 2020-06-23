@@ -43,7 +43,7 @@ redis的数据库默认是16个。在初始化的时候，会为每个数据库�
 
 配置redis pipe相关属性
 
-**创建定时器回调函数**：每隔1ms执行一次`serverCron`函数。
+**创建定时器回调函数**：按照server.Hz的频率执行`serverCron`函数。
 
 -   serverCron函数：
     -   如果开启了看门狗，需要重置看门狗

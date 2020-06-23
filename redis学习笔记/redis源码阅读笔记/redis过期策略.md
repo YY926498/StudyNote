@@ -5,7 +5,7 @@
 主要的一个函数为`activeExpireCycle`，这个函数有两种执行方式，一种是`ACTIVE_EXPIRE_CYCLE_FAST`，另一种是`ACTIVE_EXPIRE_CYCLE_SLOW`。
 
 -   `ACTIVE_EXPIRE_CYCLE_FAST`：主要调用方式是每次ae事件循环的时候，在调用`aeApiPoll`之前，会调用`beforeSleep`函数。在`beforeSleep`函数里，如果开启了`server.active_expire_enabled`选项，就会进入过期键函数中。此时，该函数调用不会超过`EXPIRE_FAST_CYCLE_DURATION`
--   `ACTIVE_EXPIRE_CYCLE_SLOW`：在定时函数`serverCron`中的`databasesCron`函数中如果开启了`server.active_expire_enabled`选项，会调用过期键函数。**这里有个疑问：定时函数根据源码来看是1ms调用1次，但是serverCron的注释却是跟随server.Hz**。
+-   `ACTIVE_EXPIRE_CYCLE_SLOW`：在定时函数`serverCron`中的`databasesCron`函数中如果开启了`server.active_expire_enabled`选项，会调用过期键函数。。
 
 `activeExpireCycle`源码分析：
 
@@ -31,9 +31,9 @@
 
 里面根据redis的过期策略执行相应动作。
 
-`MAXMEMORY_NO_EVICTION`：循环等待后台线程删除一些键，直到有空闲内存
+`MAXMEMORY_NO_EVICTION`：本函数内不删除键，但是会循环等待后台线程删除一些键，直到有空闲内存
 
-`MAXMEMORY_FLAG_LRU`、`MAXMEMORY_FLAG_LFU`或者`MAXMEMORY_VOLATILE_TTL`：根据对应的规则在设置了过期键的哈希表或者全部键中进行采样，一般是采样16个。
+`MAXMEMORY_FLAG_LRU`、`MAXMEMORY_FLAG_LFU`或者`MAXMEMORY_VOLATILE_TTL`：根据对应的规则在设置了过期键的哈希表或者全部键中进行采样，一般是采样16个，然后选出最适合的。
 
 `MAXMEMORY_ALLKEYS_RANDOM`和`MAXMEMORY_VOLATILE_RANDOM`：针对是否设置`MAXMEMORY_ALLKEYS_RANDOM`，选择设置了过期键的哈希表或则全部键的哈希表，随机挑选键。
 
