@@ -82,11 +82,11 @@ ZooKeeper的API暴露了一下方法：
 
 `exists /path`
 
-​	检查是否存在名为`/path`的节点
+​	检查是否存在名为`/path`的节点，在3.6中没有该命令，可以用`stat /path`查看znode的信息
 
 `setData /path data`
 
-​	设置名为`/path`的znode的数据为data
+​	设置名为`/path`的znode的数据为data，在3.6中好像是`set /path “data”`
 
 `getData /path`
 
@@ -94,7 +94,7 @@ ZooKeeper的API暴露了一下方法：
 
 `getChildren /path`
 
-​	返回`/path`节点的所有子节点列表
+​	返回`/path`节点的所有子节点列表，在3.6中为`get /path`
 
 ZooKeeper不允许局部写入或读取znode节点的数据。
 
@@ -134,5 +134,7 @@ ZooKeeper采用基于通知`notification`的机制：客户端向ZooKeeper注册
 -   为数据设置watch：节点有不同的改动方式，ZooKeeper维护两个观察列表：数据观察和子节点观察。`getData`和`exists`设置数据观察，`getChildren`设置子节点观察。不同的返回数据有不同的观察。
 -   时序性和一致性：watcher是在client连接到ZooKeeper服务端的本地维护。当一个client连接到新server，watch将会触发任何session事件，断开连接后不能接收到。当客户端重连，先前注册的watcher将会被重新注册并触发。
 
+#### 版本
 
+每一个znode都有一个版本号，随着每次数据变化而自增。可以使用`stat /path`中的查看具体信息，如果是znode数据变化，则查看`dataVersion`。如果是子节点变化，可以查看`cversion`。
 
