@@ -289,3 +289,8 @@ create /tasks/task-00000/status "done"
 
 ## 使用ZooKeeper进行开发
 
+使用go-zookeeper库进行学习。
+
+文档：https://godoc.org/github.com/samuel/go-zookeeper/zk#pkg-index
+
+GitHub：https://github.com/go-zookeeper/zk
