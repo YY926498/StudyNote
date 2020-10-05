@@ -294,3 +294,30 @@ create /tasks/task-00000/status "done"
 文档：https://godoc.org/github.com/samuel/go-zookeeper/zk#pkg-index
 
 GitHub：https://github.com/go-zookeeper/zk
+
+### 建立ZooKeeper会话
+
+~~~go
+func Connect(servers []string, sessionTimeout time.Duration, options ...connOption) (*Conn, <-chan Event, error) 
+~~~
+
+建立一个新的会话。其中第一个参数为ZooKeeper服务器地址，如果有多个，可依次填写，格式为`IP:PORT`，其中PORT=2181时可省略。第二个参数为会话超时。其中第三个参数为连接选项，是一个函数：
+
+~~~go
+type connOption func(c *Conn) 
+~~~
+
+支持的函数接口有：
+
+~~~go
+func WithDialer(dialer Dialer) connOption
+func WithHostProvider(hostProvider HostProvider) connOption
+func WithLogger(logger Logger) connOption
+func WithLogInfo(logInfo bool) connOption
+func WithEventCallback(cb EventCallback)
+~~~
+
+如果填写多个ZooKeeper服务器地址，假如当前连接z1，同时注册一个监听子节点的监视器。现在删除杀死z1，此时客户端会自动连接其他服务器。
+
+其中返回值`Conn`代表会话连接。`Event`代表监视器，默认缓冲区为6。
+

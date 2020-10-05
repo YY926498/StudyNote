@@ -9,3 +9,9 @@ https://studygolang.com/articles/10420
 https://blog.csdn.net/zhang197093/article/details/78559903?locationNum=5&fps=1
 
 https://github.com/stamblerre/gocode
+
+为vim增加lua支持：
+
+```shell
+sudo apt install vim-nox
+```
