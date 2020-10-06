@@ -321,3 +321,48 @@ func WithEventCallback(cb EventCallback)
 
 其中返回值`Conn`代表会话连接。`Event`代表监视器，默认缓冲区为6。
 
+**ZooKeeper管理连接**：ZooKeeper客户端库会监控与服务之间的连接，客户端库会告诉连接之间发生的问题，还会主动尝试重新建立通信。
+
+测试：
+
+~~~go
+package main
+                               
+import (
+    "fmt"
+    "time"
+
+    "github.com/go-zookeeper/zk"
+)
+
+func main() {
+    conn, connwatch, err := zk.Connect([]string{"127.0.0.1:2181"}, time.Second)
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+    go func() {
+        for {
+            event := <-connwatch
+            fmt.Println("conn watch:", event)
+        }
+    }()
+    for {
+    }
+}
+~~~
+
+如果ZooKeeper服务器在运行，正常输出：
+
+~~~sh
+conn watch: {EventSession StateHasSession  <nil> 127.0.0.1:2181}
+~~~
+
+如果突然杀死ZooKeeper服务器，输出如下：
+
+~~~sh
+conn watch: {EventSession StateConnecting  <nil> 127.0.0.1:2181}
+2020/10/05 21:00:21 failed to connect to 127.0.0.1:2181: dial tcp 127.0.0.1:2181: connect: connection refused
+~~~
+
+然后再重启ZooKeeper服务器，会重新建立连接。
