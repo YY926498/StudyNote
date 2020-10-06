@@ -366,3 +366,51 @@ conn watch: {EventSession StateConnecting  <nil> 127.0.0.1:2181}
 ~~~
 
 然后再重启ZooKeeper服务器，会重新建立连接。
+
+### 获取管理权
+
+ZooKeeper通过插件式的认证方法提供了每个节点的ACL策略功能，因此，可以限制某个用户对某个znode节点的权限。
+
+例程：
+
+~~~go
+package main
+                               
+import (
+    "fmt"
+    "os"
+    "strconv"
+    "time"
+
+    "github.com/go-zookeeper/zk"
+)
+
+func main() {
+    conn, event, err := zk.Connect([]string{"127.0.0.1:2181"}, time.Second)
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+    go func() {
+        for cur := range event {
+            fmt.Println("conn event:", cur) 
+        }
+    }()
+    children, stat, childevent, err := conn.ChildrenW("/")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("children:", children, "stat:", *stat, "err:", err)
+    childwatch := <-childevent
+    fmt.Println("childwatch:", childwatch)
+    pid := strconv.Itoa(os.Getpid())
+    fmt.Println("cur pid:", pid)
+    res, err := conn.Create("/newmaster", []byte(pid), zk.FlagTTL, zk.WorldACL(zk.PermAll))
+    if err != nil {
+        fmt.Println("create fail:", err)
+    }
+    fmt.Println("Create res:", res) 
+}
+~~~
+
+运行ZooKeeper服务器后，连续运行上面的程序三次。然后改变ZooKeeper服务器下根目录的子节点数量，这样三个客户端就会争抢创建`/newmaster`子节点。在调用时需要注意ACL权限。
