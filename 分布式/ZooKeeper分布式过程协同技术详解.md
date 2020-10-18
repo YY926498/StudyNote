@@ -745,3 +745,23 @@ ZooKeeper中最简单的流水线是独立服务器。包含三种请求处理�
 
 第一个处理器同样是`PrepRequestProcessor`，而之后的处理器则为`ProposalRequestProcessor`。该处理器会准备一个提议，并将该提议发送给追随者。`ProposalRequestProcessor`将会把所有请求转发给`CommitRequestProcessor`，而且，对于写操作请求，还会将请求转发给`SyncRequestProcessor`处理器。
 
+`SyncRequestProcessor`处理器所执行的操作与独立服务器中的一样，即持久化事务到磁盘上。执行完之后会触发`AckRequestProcessor`处理器，这个处理器时一个简单请求处理器，仅仅生成确认信息并返回给自己。在仲裁模式下，群首需要收到每个服务器的确认信息，也包括群首自己，而`AckRequestProcessor`处理器就负责这个。
+
+而`ProposalRequestProcessor`处理器之后的处理器为`CommitRequestProcessor`。`CommitRequestProcessor`会将收到足够多的确认信息的提议进行提交。
+
+下一个处理器也是最后一个名为`FinalRequestProcessor`处理器，它的作用与独立服务器一样。处理更新类型的请求，并执行读取请求。在`FinalRequestProcessor`处理器之前还有一个简单的请求处理器，这个处理器会从提议列表中删除那些待接受的提议，这个处理器的名字叫`ToBeAppliedRequestProcessor`。待接受请求列表包括那些已经被仲裁法定人数所确认的请求，并等待被执行。群首使用这个列表与追随者之间进行同步，并将收到确认信息的请求加入到这个列表中。之后`ToBeAppliedRequestProcessor`处理器就会在`FinalRequestProcessor`处理器执行后删除这个列表中的元素。
+
+只有更新请求才会加入到待接受请求列表中，然后由`ToBeAppliedRequestProcessor`处理器从该列表移除。`ToBeAppliedRequestProcessor`处理器并不会对读取请求进行任何额外的处理操作，而是由`FinalRequestProcessor`处理器进行操作。
+
+#### 追随者和观察者服务器
+
+**追随者**
+
+首先从`FollowerRequestProcessor`处理器开始，该处理器接受并处理客户端请求。之后转发请求给`CommitRequestProcessor`，同时也会转发写请求到群首服务器。`CommitRequestProcessor`会直接转发读取请求到`FinalRequestProcessor`处理器，而且对于写请求，`CommitRequestProcessor`在转发给`FinalRequestProcessor`处理器之前会等待提交事务。
+
+当群首接收到一个新的写请求时，直接或通过其他追随者服务器来生成一个提议，之后转发到追随者服务器。当收到一个提议，追随者服务器会发送这个提议到`SyncRequestProcessor`处理器，然后`SendRequestProcessor`会向群首发送确认信息。当群首服务器接收到足够的确认信息来提交这个提议时，群首就会发送提交事务给追随者（同时也会发送INFORM消息给观察者）。当接收到提交事务消息时，追随者就通过`CommitRequestProcessor`处理器进行处理。
+
+为了保证执行的顺序，`CommitRequestProcessor`处理器在收到一个写请求时暂停后续的请求处理。通过等待的方式，请求可以保证按照接收到的顺序来执行。
+
+对于观察者服务器的请求流水线与追随者服务器的流水线非常相似。但是因为观察者服务器不需要确认提议信息，因此观察者服务器并不需要发送确认信息给群首服务器。也不用持久化事务到硬盘。
+
