@@ -876,3 +876,17 @@ ZooKeeper服务器在启动时从一个名为zoo.cfg的配置文件中读取所�
 `weight.x=n`：该选项常常以一组参数进行配置，指定组成一个仲裁机构的某个服务器的权重为n，其权重n值指示了该服务器在进行投票时的权重值。
 
 `traceFile`：持续跟踪ZooKeeper的操作，并将操作记录到跟踪日志中，跟踪日志的文件名为`traceFile.year.month.day`。除非设置了该选项`requestTraceFile`，否则跟踪功能不会启用。该选项用来提供ZooKeeper所进行的操作的详细视图。ZooKeeper会序列化操作，并将操作写入磁盘，会影响系统运行。
+
+#### 网络配置
+
+`globalOutstandingLimit`：ZooKeeper待处理请求的最大值。ZooKeeper客户端提交请求比ZooKeeper服务器端处理请求要快很多，服务端会对接收到的请求队列化，最终可能导致服务端的内存溢出。因此，当ZooKeeper服务端中待处理请求达到`globalOutstandingLimit`值就会限制客户端的请求。但是该值不是硬限制，因为每个客户端至少有一个待处理请求，否则会导致客户端超时，因此，当达到`globalOutstandingLimit`值后，服务端还会继续接收客户端连接中的请求，条件是这个客户端在服务器中没有任何待处理的请求。默认值为1000个请求。
+
+`maxClientCnxns`：允许每个IP地址的并发socket连接的最大数量。ZooKeeper通过流量控制和限制值来避免过载情况的发生。一个连接的建立所使用的资源远远高于正常操作请求所使用的资源。默认为60个并发连接。**每个服务器维护这个连接的数量。集群中的服务器不共享**。
+
+`clientPortAddress`：限制客户端连接到指定的接收信息的地址上。默认情况下，一个ZooKeeper服务器会监听在所有的网络接口上等待客户端的连接。比如一个服务器有多个网口，一个公网，一个内网，限制必须连接内网。
+
+`minSessionTimeout`：最小会话超时时间，单位为毫秒。当客户端建立一个连接后就会请求一个明确的超时值，而客户端实际获得的超时值不低于`minSessionTimeout`值。默认为`tickTime`值的两倍。
+
+`maxSessionTimeout`：会话的最大超时时间，单位为毫秒。默认为`tickTime`的20倍。
+
+#### 集群配置
