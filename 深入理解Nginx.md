@@ -21,3 +21,38 @@ Nginx的四个主要组成部分：
 3. access.log访问日志：记录每一条Http请求信息
 4. error.log错误日志：定位问题
 
+## Nginx的命令行控制
+
+默认情况下，Nginx被安装在目录`/usr/local/nginx`中，二进制文件安装在`/usr/local/nginx/sbin/nginx`，配置文件路径为`/usr/local/nginx/conf/nginx.conf`。
+
+1.  默认方式启动
+
+    直接执行Nginx二进制程序：
+
+    ```shell
+    /usr/local/sbin/nginx
+    ```
+
+    这时会打开在configure命令执行时使用`--conf-path=PATH`指定的nginx.conf文件。
+
+2.  另行指定配置文件的启动方式
+
+    使用`-c`参数指定配置文件：
+
+    ```shell
+    /usr/local/nginx/sbin/nginx -c /tmp/nginx.conf
+    ```
+
+3.  另行指定安装目录的启动方式
+
+    使用`-p`参数指定Nginx的安装目录：
+
+    ```shell
+    /usr/local/nginx/sbin/nginx -p /usr/local/nginx/
+    ```
+
+4.  另行指定全局配置项的启动方式
+
+    通过`-g`参数临时指定一些全局配置项，以使新的配置项
+
+
