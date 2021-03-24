@@ -292,6 +292,36 @@ Nginx在运行时，至少必须加载几个核心模块和一个事件类模块
 
 ### 用于调试进程和定位问题的配置项
 
+1.  查看是否以守护进程方式运行Nginx
 
+    语法：`daemon on|off`
+
+    默认：`daemon on`
+
+    守护进程是脱离终端并且在后台运行的进程。
+
+2.  是否以`master/worker`方式工作
+
+    语法：`master_process on|off`
+
+    默认：`master_process on`
+
+    如果用`off`关闭了`master_process`方式，就不会fork出worker子进程来处理请求，而是用master进程自身来处理请求。
+
+3.  `error`日志的设置
+
+    语法：`error_log /path/file level`
+
+    默认：`error_log logs/error.log error`
+
+    `error`日志是定位Nginx问题的最佳工具，可以根据需要妥善设置`error`日志的路径和级别。
+
+    `/path/file`参数可以是一个具体的文件，此时最好将文件放到一个磁盘空间足够大的位置；也可以是`/dev/null`，这样就不会输出任何日志，这也是关闭`error`日志的唯一手段；也可以是`stderr`，日志就会输出到标准错误文件中。
+
+    `level`是日志的输出级别，取值范围是`debug`、`info`、`warn`、`error`、`crit`、`alert`、`emerg`，从左至右依次增大。当设定为一个级别时，大于或等于该级别的日志都会被输出到`/path/file`文件中，小于该级别的日志则不会输出。
+
+    **注**：如果日志级别设定到`debug`，必须在configure时加入`--with-debug`配置项。
+
+    
 
 
