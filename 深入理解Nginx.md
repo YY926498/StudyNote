@@ -321,6 +321,29 @@ Nginx在运行时，至少必须加载几个核心模块和一个事件类模块
     `level`是日志的输出级别，取值范围是`debug`、`info`、`warn`、`error`、`crit`、`alert`、`emerg`，从左至右依次增大。当设定为一个级别时，大于或等于该级别的日志都会被输出到`/path/file`文件中，小于该级别的日志则不会输出。
 
     **注**：如果日志级别设定到`debug`，必须在configure时加入`--with-debug`配置项。
+    
+4.  是否处理几个特殊的调试点
+    
+    语法：`debug_points [stop|abort]`
+    
+    Nginx在一些关键的错误逻辑中设置了调试点。如果设置为`stop`，那么Nginx的代码执行到这些调试点时会发出SIGSTOP信号用于调试。如果设置为abort，则会产生一个coredump文件，可以使用gdb来查看Nginx当时的各种信息。
+    
+5.  仅对指定的客户端输出debug级别的日志
+    
+    语法：`debug_connection [IP|CIDR]`
+    
+    这个配置项实际上属于事件类配置，因此，必须放在events{…}中才有效。值必须是IP地址或CIDR地址，例如：
+    
+    ~~~nginx
+    events {
+        debug_connection 10.224.66.14;
+        debug_connection 10.224.57.0/24;
+    }
+    ~~~
+    
+    这样，仅仅来自以上IP地址的请求才会输出debug级别的日志，其他请求仍然沿用error_log中配置的日志级别。
+    
+6.  
 
     
 
