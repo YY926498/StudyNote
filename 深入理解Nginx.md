@@ -355,102 +355,157 @@ Nginx在运行时，至少必须加载几个核心模块和一个事件类模块
 
     worker进程的工作目录。需确保worker进程有权限向worker_directory指定的目录中写入文件。
 
-    ### 正常运行的配置项
+### 正常运行的配置项
+1.  定义环境变量
 
-    1.  定义环境变量
+语法：`env VAR|VAR=VALUE`
 
-        语法：`env VAR|VAR=VALUE`
+这个配置项可以让用户直接设置操作系统上的环境变量。例如：
 
-        这个配置项可以让用户直接设置操作系统上的环境变量。例如：
+~~~nginx
+env TESTPATH=/tmp/;
+~~~
 
-        ~~~nginx
-        env TESTPATH=/tmp/;
-        ~~~
+2.  嵌入其他配置文件
 
-    2.  嵌入其他配置文件
+语法：`include /path/file`
 
-        语法：`include /path/file`
+include配置项可以将其他配置文件嵌入到当前的nginx.conf文件中，它的参数既可以是绝对路径，也可以是相对路径（相对于nginx.conf所在的目录），例如：
 
-        include配置项可以将其他配置文件嵌入到当前的nginx.conf文件中，它的参数既可以是绝对路径，也可以是相对路径（相对于nginx.conf所在的目录），例如：
+~~~Nginx
+include mime.types
+include vhost/*.conf
+~~~
 
-        ~~~Nginx
-    include mime.types
-        include vhost/*.conf
-        ~~~
-    
-        参数的值可以是一个明确的文件名，也可以是含有通配符`*`的文件名，同时可以一次嵌入多个配置文件。
-    
-    3.  pid文件的路径
-    
-        语法：`pid path/file`
-    
-        默认：`pid logs/nginx.pid;`
-    
-        保存master进程ID的pid文件存放路径。默认与configure执行时的参数`--pid-path`所指定的路径是相同的，也可以随时修改，但应确保Nginx有权在相应的目录中创建pid文件，该文件直接影响Nginx是否可以运行。
-    
-    4.  Nginx worker进程运行的用户及用户组
-    
-        语法：`user username [groupname]`
-    
-        默认：`user nobody nobody;`
-    
-        user用于设置master进程启动后，fork出的worker进程运行在哪个用户和用户组下。当按照`user username;`设置时，用户组名与用户名相同。
-    
-        若用户在configure命令执行时使用了参数`--user=username`和`--group=groupname`，此时，nginx.conf将使用参数中指定的用户和用户组。
-    
-    5.  执行Nginx worker进程可以打开的最大文件句柄数
-    
-        语法：`worker_rlimit_nofile limit`
-    
-        设置一个worker进程可以打开的最大文件句柄数。
-    
-    6.  限制信号队列
-    
-        语法：`worker_rlimit_sigpenging limit`
-    
-        设置每个用户发往Nginx的信号队列的大小。当某个用户的信号队列满了，这个用户再发送的信号量会被丢掉。
-    
-    ### 优化性能的配置项
-    
-    1.  Nginx  worker进程的个数
-    
-        语法：`worker_processes number`
-    
-        默认：`worker_processes 1;`
-    
-        在master/worker运行方式下，定义worker进程的个数。worker进程的数量会直接影响性能。每个worker进程都是单线程的进程，会调用各个模块以实现多种功能。如果这些模块不会出现阻塞式的调用，那么有多少CPU核心就配置多少个进程；反之，需要配置更多的进程。一般情况下，配置与内核数相等的worker进程，并且使用下面的`worker_cpu_affinity`配置来绑定CPU内核。
-    
-    2.  绑定Nginx worker进程到指定的CPU内核
-    
-        语法：`worker_cpu_affinity cpumask [cpumask...]`
-    
-        通过绑定，可以内核的调度策略上实现完全的并发。
-    
-        ~~~nginx
-        worker_processes 4;
-        worker_cpu_affinity 1000 0100 0010 0001;
-        ~~~
-    
-        注：`worker_cpu_affinity`配置仅对Linux操作系统有效。Linux操作系统使用`sched_setaffinity()`系统的调用实现这个功能。
-    
-    3.  SSL硬件加速
-    
-        语法：`ssl_engine device`
-    
-        如果服务器上有SSL硬件加速设备，那么就可以进行配置以加快SSL协议的处理速度，用户可以使用OpenSSL提供的命令查看是否有SSL硬件加速设备：
-    
-        ~~~shell
-        openssl engine -t;
-        ~~~
-    
-    4.  系统调用gettimeofday的执行频率
-    
-        语法：`timer_resolution t`
-    
-        默认情况下，每次内核的事件调用`epoll、select、poll、kqueue`等返回时，都会执行一次gettimeofday，实现用内核的时钟来更新Nginx的缓存时钟。例如`timer_resolution 100ms;`表示至少每100ms才调用一次gettimeofday。
-    
-    5.  
-    
-    
+参数的值可以是一个明确的文件名，也可以是含有通配符`*`的文件名，同时可以一次嵌入多个配置文件。
 
+3.  pid文件的路径
+
+语法：`pid path/file`
+
+默认：`pid logs/nginx.pid;`
+
+保存master进程ID的pid文件存放路径。默认与configure执行时的参数`--pid-path`所指定的路径是相同的，也可以随时修改，但应确保Nginx有权在相应的目录中创建pid文件，该文件直接影响Nginx是否可以运行。
+
+4.  Nginx worker进程运行的用户及用户组
+
+语法：`user username [groupname]`
+
+默认：`user nobody nobody;`
+
+user用于设置master进程启动后，fork出的worker进程运行在哪个用户和用户组下。当按照`user username;`设置时，用户组名与用户名相同。
+
+若用户在configure命令执行时使用了参数`--user=username`和`--group=groupname`，此时，nginx.conf将使用参数中指定的用户和用户组。
+
+5.  执行Nginx worker进程可以打开的最大文件句柄数
+
+语法：`worker_rlimit_nofile limit`
+
+设置一个worker进程可以打开的最大文件句柄数。
+
+6.  限制信号队列
+
+语法：`worker_rlimit_sigpenging limit`
+
+设置每个用户发往Nginx的信号队列的大小。当某个用户的信号队列满了，这个用户再发送的信号量会被丢掉。
+
+### 优化性能的配置项
+
+1.  Nginx  worker进程的个数
+
+语法：`worker_processes number`
+
+默认：`worker_processes 1;`
+
+在master/worker运行方式下，定义worker进程的个数。worker进程的数量会直接影响性能。每个worker进程都是单线程的进程，会调用各个模块以实现多种功能。如果这些模块不会出现阻塞式的调用，那么有多少CPU核心就配置多少个进程；反之，需要配置更多的进程。一般情况下，配置与内核数相等的worker进程，并且使用下面的`worker_cpu_affinity`配置来绑定CPU内核。
+
+2.  绑定Nginx worker进程到指定的CPU内核
+
+语法：`worker_cpu_affinity cpumask [cpumask...]`
+
+通过绑定，可以内核的调度策略上实现完全的并发。
+
+~~~nginx
+worker_processes 4;
+worker_cpu_affinity 1000 0100 0010 0001;
+~~~
+
+注：`worker_cpu_affinity`配置仅对Linux操作系统有效。Linux操作系统使用`sched_setaffinity()`系统的调用实现这个功能。
+
+3.  SSL硬件加速
+
+语法：`ssl_engine device`
+
+如果服务器上有SSL硬件加速设备，那么就可以进行配置以加快SSL协议的处理速度，用户可以使用OpenSSL提供的命令查看是否有SSL硬件加速设备：
+
+~~~shell
+openssl engine -t;
+~~~
+
+4.  系统调用gettimeofday的执行频率
+
+语法：`timer_resolution t`
+
+默认情况下，每次内核的事件调用`epoll、select、poll、kqueue`等返回时，都会执行一次gettimeofday，实现用内核的时钟来更新Nginx的缓存时钟。例如`timer_resolution 100ms;`表示至少每100ms才调用一次gettimeofday。
+
+5.  Nginx worker进程优先级设置
+
+语法：`worker_priority nice`
+
+默认：`worker_priority 0;`
+
+优先级越高，进程分配到的时间片越大，因此优先级高的进程会占用更多的系统资源。优先级由静态优先级和内核根据进程执行情况所做的动态调整。nice值是进程的静态优先级，取值范围是-20~+19。-20是最高优先级，建议不小于-5。
+
+### 事件类配置项
+1.  是否打开accept锁
+
+语法：`accept_mutex [on|off]`
+
+默认：`accept_mutex on;`
+
+accept_mutex是Nginx的负载均衡锁，这把锁可以让多个worker进程轮流地、序列化地与新的客户端建立TCP连接。当某一个worker进程建立的连接数量达到worker_connections配置的最大连接数的7/8时，会大大减少该worker进程试图建立新的TCP连接的机会，以此实现所有worker进程之上处理的客户端请求数尽量接近。
+
+2.  lock文件的路径
+
+语法：`lock_file path/file`
+
+默认：`lock_file logs/nginx.lock`
+
+accept锁可能需要这个lock文件，如果accept锁关闭，lock_file配置完全不生效。如果打开了accept锁，并且由于编译程序、操作系统架构等因素导致Nginx不支持原子锁，这时才会用文件实现accept锁，这样lock_file指定的lock文件才会生效。
+
+3.  使用accept锁后到真正建立连接之间的延迟时间
+
+语法：`accept_mutex_delay Nms`
+
+默认：`accept_mutex_delay 500ms;`
+
+在使用accept锁后，同一时间只有一个worker进程能够取得accept锁。这个accept锁不是阻塞锁，如果取不到会立刻返回。如果一个worker进程试图获取accept锁但是没有取到，至少要等accept_mutex_delay定义的时间间隔后才能再次试图获取锁。
+
+4.  批量建立新连接
+
+语法：`multi_accept [on|off]`
+
+默认：`multi_accept off;`
+
+当事件模型通知有新连接时，尽可能地对本次调度中客户端发起的所有TCP请求都建立连接。
+
+5.  选择事件模型
+
+语法：`use [kqueue|rtsig|epoll|/dev/poll|select|poll|eventpoll]`
+
+Nginx会自动使用最适合的事件模型。
+
+6.  每个worker的最大连接数
+
+语法：`worker_connections number`
+
+定义每个worker进程可以同时处理的最大连接数。
+
+## 用HTTP核心模块配置一个静态Web服务器
+
+   静态Web服务器的主要功能由`ngx_http_core_module`模块（HTTP框架的主要成员）实现。除了之前提到的基本配置项外，一个典型的静态Web服务器还会包括多个server块和location块。
+
+所有的HTTP配置项都必须直属于http块、server块、location块、upstream块或if块等（HTTP配置项自然必须全部在http{}块之内，“直属于”是指配置项直接所属的大括号对应的配置块）。
+
+### 虚拟主机与请求的分发
 
