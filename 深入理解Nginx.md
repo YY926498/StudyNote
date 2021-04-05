@@ -509,3 +509,98 @@ Nginx会自动使用最适合的事件模型。
 
 ### 虚拟主机与请求的分发
 
+由于IP地址的数量有限，存在多个主机域名对应着同一个IP地址的情况，在nginx.conf中按照server_name并通过server块来定义虚拟主机，每个server块就是一个虚拟主机，只处理与之相对应的主机域名请求。这样一台服务器上的Nginx能以不同的方式处理不同主机域名的HTTP请求。
+
+1.  监听端口
+
+    语法：`listen address:port [default|default_server|[backlog=num|rcvbuf=size|sndbuf=size|accept_filter=filter|deferred|bind|ipv6only=[on|off]|ssl]]`
+
+    默认：`listen 80;`
+
+    配置块：server
+
+    listen参数决定Nginx如何监听端口。例如：
+
+    ```nginx
+    listen 127.0.0.1;#不加端口时，默认监听80端口
+    listen [:::a8c9:1234]:80;
+    listen 443 default_server ssl;
+    ```
+
+    listen可用参数的意义：
+
+    -   default：将所在的server块作为整个的Web服务的默认server块。如果该参数没有设置，就以在nginx.conf中找到的第一个server块作为默认的server块。
+    -   default_server：同上。
+    -   backlog=num：表示TCP中backlog队列的大小。默认为-1.表示不予设置。
+    -   rcvbuf=size：设置监听句柄的SO_RCVBUF参数。
+    -   sndbuf=size：设置监听句柄的SO_SNDBUF参数。
+    -   accept_filter：设置accept过滤器，只对FreeBSD操作系统有效。
+    -   deferred：设置该参数后，如果发起建立连接请求，并且完成了TCP的三次握手，内核也不会为了这次的连接调度worker进程来处理，只有用户真正发送请求数据时，内核才会唤醒worker进程处理这个连接。适用于大并发的情况下，减轻worker进程的负担。
+    -   bind：绑定当前端口/地址对，如127.0.0.1:8080，只有对一个端口监听多个地址时才会生效。
+    -   ssl：在当前监听的端口上建立的连接必须基于SSL协议。
+
+2.  主机名称
+
+    语法：`server_name name [...]`
+
+    默认：`server_name “”;`
+
+    配置块：server
+
+    server_name后可以跟多个主机名称，如server_name www.testweb.com download.testweb.com;
+
+    在开始处理一个HTTP请求时，Nginx会取出header头中的Host，与每个server中的server_name进行匹配，以此决定由哪一个server块来处理请求。有可能一个Host与多个server块中的server_name都匹配，这时会根据匹配优先级来实际处理server块。匹配优先级如下：
+
+    1.  首先选择所有字符串完全匹配的server_name，如www.testweb.com。
+    2.  其次选择通配符在前面的server_name，如*.testweb.com。
+    3.  再次选择通配符在后面的server_name，如www.testweb.*。
+    4.  最后选择使用正则表达式才匹配的server_name，如`~^\.testweb\.com$`。
+
+    如果Host与所有的server_name都不匹配，按下列顺序选择处理server块：
+
+    1.  优先选择在listen配置项后加入`[default|default_server]`的server块。
+    2.  找到匹配的listen端口的第一个server块。
+
+    如果server_name后跟着空字符串，那么表示匹配没有Host这个HTTP头部的请求。
+
+3.  server_names_hash_bucket_size
+
+    语法：`server_name_hash_bucket_size size`
+
+    默认：`server_name_hash_bucket_size 32|64|128;`
+
+    配置块：http、server、location
+
+    为了提高快速找寻到相应的serve name的能力，Nginx采用散列表存储server name。
+
+4.  server_name_hash_max_size
+
+    语法：`server_name_hash_max_size size`
+
+    默认：`server_name_hash_max_size 512;`
+
+    配置块：http、server、location
+
+    该选项影响散列表的冲突率。
+
+5.  重定向主机名称的处理
+
+    语法：`server_name_in_redirect on|off`
+
+    默认：`server_name_in_redirect on;`
+
+    配置块：http、server或者location
+
+    该配置需要配合server_name使用。在使用on打开时，表示在重定向请求时会使用server_name里配置的第一个主机名代替原先请求中的Host头部，而使用off关闭时，表示在重定向请求时使用请求本身的头部。
+
+6.  location
+
+    语法：`location [=|~|~*|^~|@] /uri/ {...}`
+
+    配置块：server
+
+    location会尝试根据用户请求中的URI来匹配上面的/uri表达式，如果可以匹配，选择location{}块中的配置来处理用户请求。匹配方式如下：
+
+    
+
+7.  
