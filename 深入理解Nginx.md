@@ -601,6 +601,148 @@ Nginx会自动使用最适合的事件模型。
 
     location会尝试根据用户请求中的URI来匹配上面的/uri表达式，如果可以匹配，选择location{}块中的配置来处理用户请求。匹配方式如下：
 
-    
+    1.  =表示把URI作为字符串，以便于参数中的uri做完全匹配
+    2.  ~表示匹配URI时是字母大小写敏感的
+    3.  ~*表示匹配URI时忽略字母大小写问题
+    4.  ^~表示匹配URI时只需要其前半部分与uri参数匹配即可
+    5.  @表示仅用于Nginx服务内部请求之间的重定向，带有@的location不直接处理用户请求。
+    6.  在uri参数里可以使用正则表达式
+
+    注：location有顺序，当有多个location可以匹配时，只被第一个location采用。
+
+    在最后一个location使用`/`作为参数，会匹配所有HTTP请求。
+
+### 文件路径的定义
+
+1.  以root方式设置资源路径
+
+    语法：`root path`
+
+    默认：`root html;`
+
+    配置块：http、server、location、if
+
+    例如，定义资源文件相对于HTTP请求的根目录
+
+    ~~~Nginx
+    location /download/ {
+        root /opt/web/html/;
+    }
+    ~~~
+
+    在上面的配置中，如果有一个请求的URI是`/download/index/test.html`，那么Web服务器将会返回服务器上`/opt/web/html/download/index/test.html`文件的内容。
+
+2.  以alias方式设置资源路径
+
+    语法：`alias path`
+
+    配置块：location
+
+    alias也是用来设置文件资源路径的，与root不同点主要在于如何解读紧跟location后面的uri参数，会使alias与root以不同的方式将用户请求映射到真正的磁盘文件上。如果一个请求的URI是`/conf/nginx.conf`，用户实际想访问的文件在`/usr/local/nginx/conf/nginx.conf`，两种方式如下：
+
+    ~~~nginx
+    #alias方式
+    location /conf {
+        alias /usr/local/nginx/conf/;
+    }
+    #root方式
+    location /conf {
+        root /usr/local/nginx/;
+    }
+    ~~~
+
+    使用alias时，在URI想实际文件路径的映射过程中，已经把location后配置的`/conf`丢弃掉。这也是root可以放置到http、server、location或if块中，而alias只能放置到location块。
+
+    alias后面还可以添加正则表达式，例如：
+
+    ~~~nginx
+    location ~ ^/test/(\w+)\.(\w+)$ {
+        alias /usr/local/nginx/$2/$1.$2;
+    }
+    ~~~
+
+    请求访问`/test/nginx.conf`时，Nginx会访问`/usr/local/nginx/conf/nginx.conf`中的内容。
+
+3.  访问首页
+
+    语法：`index file`
+
+    默认：`index index.html`
+
+    配置块：http、server、location
+
+    有时，访问站点时的URI是`/`，这时一般是返回网站的首页。index后可以跟多个文件参数，Nginx将会按照顺序来访问这些文件，例如：
+
+    ```nginx
+    location / {
+        root path;
+        index /index.html /html/index.php /index.php;
+    }
+    ```
+
+    接收到请求后，Nginx首先会尝试访问`path/index.html`文件，如果可以被访问，就直接范湖文件内容结束请求，否则再试图返回`path/html/index.php`文件的内容，以此类推。
+
+4.  根据HTTP返回码重定向页面
+
+    语法：`error_page code [code...] [= | =answer-code] uri|@named_location`
+
+    配置块：http、server、location、if
+
+    当对于某个请求返回错误码时，如果匹配上了`error_page`中设置的code，则重定向新的URI中。例如：
+
+    ~~~nginx
+    error_page 404	/404.html;
+    error_page 502 503 504 http://example.com/forbidden.html;
+    error_page 404 = @fetch;
+    ~~~
+
+    注意，虽然重定向了URI，但返回的HTTP错误码还是与原来的相同。可以通过`=`来更改返回的错误码，例如：
+
+    ~~~nginx
+    error_page 404 =200 /empty.gif;
+    ~~~
+
+    也可以不指定确切的返回错误码，而是由重定向后实际处理的真实结果来决定，这时只要把`=`后面的错误码去掉即可。
+
+    如果不想修改URI，只想让这样的请求重定向到另一个location中进行处理，可以如下处理：
+
+    ~~~nginx
+    location / {
+        error_page 404 @fallback;
+    }
+    location @fallback {
+        proxy_pass http://backend;
+    }
+    ~~~
+
+    这样，返回404的请求会被反向代理到`http://backend`上游服务器中处理。
+
+5.  是否允许递归使用`error_page`
+
+    语法：`recursive_error_page [on|off]`
+
+    默认：`recursive_error_page off;`
+
+    配置块：http、server、location
+
+    确定是否允许递归地定义`error_page`
+
+6.  try_files
+
+    语法：`try_files path1 [path2] uri`
+
+    配置块：server、location
+
+    `try_files`后要跟若干个路径，如path1、path2、…，而且最后必须要有uri参数，意义如下：尝试按照顺序访问每一个path，如果可以有效地读取，就直接向用户返回这个path对应的文件结束请求，否则继续向下访问。如果所有的path都找不到有效的文件，就重定向到最后的参数uri上。因此，最后这个参数uri必须存在，而且应该是可以有效重定向。例如：
+
+    ~~~nginx 
+    try_files /system/maintenance.html $uri $uri/index.html $uri.html @other;
+    location @other {
+        proxy_pass http://backend;
+    }
+    ~~~
+
+    如果前面的路径都找不到，就会反向代理到http://backend服务上，还可以指定错误码的方式与error_page配合使用。
 
 7.  
+
