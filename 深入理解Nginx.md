@@ -744,5 +744,60 @@ Nginx会自动使用最适合的事件模型。
 
     如果前面的路径都找不到，就会反向代理到http://backend服务上，还可以指定错误码的方式与error_page配合使用。
 
-7.  
+
+### 内存及磁盘资源的分配
+
+1.  HTTP包体只存储到磁盘文件中
+
+    语法：`client_body_in_file_only [on|clean|off]`
+
+    默认：`client_body_in_file_only off;`
+
+    配置块：http、server、location
+
+    当值为非off时，用户请求的HTTP包体一律存储到磁盘文件中，即使只有0字节也会存储为文件。当请求结束时，如果配置为on，则这个文件不会被删除（该配置一般用于调试、定位问题），但如果配置为clean，则会删除该文件。
+
+2.  HTTP包体尽量写入到一个内存buffer中
+
+    语法：`client_body_in_single_buffer on|off`
+
+    默认：`client_body_in_single_buffer off;`
+
+    配置块：http、server、location
+
+    用户请求中的HTTP包体一律存储到内存buffer中。当然，如果HTTP包体的大小超过了`client_body_buffer_size`设置的值，包体还是会写入到磁盘文件中。
+
+3.  存储HTTP头部的内存buffer大小
+
+    语法：`client_header_buffer_size size`
+
+    默认：`client_header_buffer_size 1k;`
+
+    配置块：http、server
+
+    该配置项定义了正常情况下Nginx接收用户请求中HTTP header部分时分配的内存buffer大小。
+
+4.  存储超大HTTP头部的内存buffer大小
+
+    语法：`large_client_header_buffers number size`
+
+    默认：`large_client_header_buffers 4 8k;`
+
+    配置块：http、server
+
+    该配置项定义Nginx接收一个超大HTTP头部请求的buffer个数和每个buffer的大小。如果HTTP请求行的大小超过上面的单个buffer，则返回`Request URI too large (414)`。请求中一般会有多个header，每一个header的大小不能超过单个的buffer的大小，否则会返回`Bad request (400)`。另外，请求行和请求头部的总和也不能超过buffer个数\*buffer大小。
+
+5.  存储HTTP包体的内存buffer大小
+
+    语法：`client_body_buffer_size size`
+
+    默认：`client_body_buffer_size 8k/16k;`
+
+    配置块：http、server、location
+
+    该配置项定义Nginx接收HTTP包体的内存缓冲区大小。
+
+    注：如果请求中含有HTTP头部`Content-Length`，并且其标识的长度小于定义的buffer大小，那么Nginx会自动降低本次请求所使用的内存buffer，以降低内存消耗。
+
+6.  
 
