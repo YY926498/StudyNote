@@ -799,5 +799,35 @@ Nginx会自动使用最适合的事件模型。
 
     注：如果请求中含有HTTP头部`Content-Length`，并且其标识的长度小于定义的buffer大小，那么Nginx会自动降低本次请求所使用的内存buffer，以降低内存消耗。
 
-6.  
+6.  HTTP包体的临时存放目录
+
+    语法：`client_body_temp_path dir-path [level1 [level2 [level3]]]`
+
+    默认：`client_body_temp_path client_body_temp;`
+
+    配置块：http、server、location
+
+    在接收HTTP包体时，如果包体的大小大于`client_body_buffer_size`，则会以一个递增的整数命名并存放到`client_body_temp_path`指定的目录中。后面跟着的level1、level2、level3是为了防止一个目录下的文件数量太多，从而导致性能下降，因此使用了level参数，例如：`client_body_temp_path /opt/nginx/client_temp 1 2;`
+
+7.  connection_pool_size
+
+    语法：`connection_pool_size size`
+
+    默认：`connection_pool_size 256;`
+
+    配置块：http、server
+
+    Nginx对于每个建立成功的TCP连接会预先分配一个内存池，上面的size配置项将指定这个内存池的初始大小，用于减少内核对于小块内存的分配次数。
+
+8.  request_pool_size
+
+    语法：`request_pool_size size`
+
+    默认：`request_pool_size 4k;`
+
+    配置块：http、server
+
+    Nginx开始处理HTTP请求时，将为每个请求都分配一个内存池，size配置项指定这个内存池的初始大小，用于减少内核对于小块内存的分配次数。TCP连接关闭时会销毁connection_pool_size指定的连接内存池，HTTP请求结束时会销毁request_pool_size指定的HTTP请求内存池，但是它们的创建、销毁时间并不一致，因为一个TCP连接可能被复用于多个HTTP请求。
+
+### 网络连接的设置
 
