@@ -831,3 +831,55 @@ Nginx会自动使用最适合的事件模型。
 
 ### 网络连接的设置
 
+## 用HTTP proxy module配置一个反向代理服务器
+
+反向代理方式是指用代理服务器来接收Internet上的连接请求，然后将请求转发给内部网络中的上游服务器，并将从上游服务器上得到的结果返回给Internet上请求连接的客服端。此时代理服务器对外的表现就是一个Web服务器。
+
+### 负载均衡的基本配置
+
+1.  upstream块
+
+    语法：`upstream name {...}`
+
+    配置块：http
+
+    upstream块定义了一个上游服务器集群，便于反向代理中的proxy_pass使用。例如：
+
+    ```nginx
+    upstream bakcend {
+        server backend1.example.com;
+        server backend2.example.com;
+    }
+    server {
+        location / {
+            proxy_pass http://backend;
+        }
+    }
+    ```
+
+2.  server
+
+    语法：`server name [parameters]`
+
+    配置块：upstream
+
+    server配置项指定了一台上游服务器的名字，这个名字可以是域名、IP地址端口、UNIX句柄等，在其后还可以跟下列参数：
+
+    -   `weight=number`：设置向这台上游服务器转发的权重。默认为1
+    -   `max_fails=number`：该选项与`fail_timeout`配合使用，指在`fail_timeout`时间段内，如果向上游服务器转发失败次数超过number，则认为在当前的`fail_timeout`时间段内，这台上游服务器不可用。`max_fails`默认为1，如果设置为0，则表示不检查失败次数。
+    -   `fail_timeout=time`：表示该时间段内转发失败多少次后就认为上游服务器暂时不可用，用于优化反向代理功能。与上游服务器建立连接的超时时间、读取上游服务器响应超时时间等完全无关。默认为10s。
+    -   `down`：表示所在上游服务器永久下线，只在使用`ip_hash`配置项时才有用
+    -   `backup`：在使用`ip_hash`配置项时它是无效的。表示所在的上游服务器只是备份服务器，只有在所有的非备份上游服务器都失效后，才会向所在的上游服务器转发请求。
+
+3.  ip_hash
+
+    语法：`ip_hash`
+
+    配置块：upstream
+
+    `ip_hash`与`weight`配置不可同时使用。如果upstream集群中有一台上游服务器暂时不可用，不能直接删除其配置，而是要`down`参数标识，确保转发策略的一贯性。
+
+### 反向代理的基本配置
+
+
+
