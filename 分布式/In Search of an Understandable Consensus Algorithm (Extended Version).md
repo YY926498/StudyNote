@@ -174,4 +174,4 @@ Raft服务器使用RPC进行通信，基本共识算法只需要两种RPC：Requ
 
 ### Leader election
 
-Raft使用心跳机制来出发leader election。
+Raft使用心跳机制来触发leader election。
